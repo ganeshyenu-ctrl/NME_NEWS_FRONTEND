@@ -8,15 +8,25 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
     steps:
+      - name: Check SSH key secret exists
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "ERROR: VPS_SSH_KEY secret is empty or missing in this repo."
+            exit 1
+          fi
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_HOST }}
+          host: 200.141.8.193
           username: root
           port: 22
           key: ${{ secrets.VPS_SSH_KEY }}
           command_timeout: 20m
+          script_stop: true
           script: |
             set -e
             cd /var/www/nme/frontend
@@ -24,9 +34,11 @@ jobs:
             git reset --hard origin/master
             npm ci
             npm run build
-            pm2 describe nme-frontend > /dev/null 2>&1 \
-              && pm2 reload nme-frontend --update-env \
-              || pm2 start ecosystem.config.cjs
+            if pm2 describe nme-frontend > /dev/null 2>&1; then
+              pm2 reload nme-frontend --update-env
+            else
+              pm2 start ecosystem.config.cjs
+            fi
             pm2 save
-            sleep 5
+            sleep 6
             curl -fI http://127.0.0.1:3000
