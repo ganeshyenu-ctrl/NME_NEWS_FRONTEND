@@ -4,12 +4,25 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { api } from '@/lib/api';
-import { PlatformSettings } from '@/types';
+import { PlatformSettings, User } from '@/types';
 import { useAppSelector } from '@/store/hooks';
-import { Save, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
+import {
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  UserCheck,
+  ShieldCheck,
+  RefreshCw,
+} from 'lucide-react';
 
 export default function AdminSettingsPage() {
   const { user: currentUser } = useAppSelector((state) => state.auth);
+
+  // General Settings State
   const [settings, setSettings] = useState<PlatformSettings>({
     publicationName: 'NME',
     tagline: 'Independent Perspectives. Informed Maritime Decisions.',
@@ -25,21 +38,48 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Self Admin Password Reset State
+  const [selfNewPassword, setSelfNewPassword] = useState('');
+  const [selfConfirmPassword, setSelfConfirmPassword] = useState('');
+  const [showSelfPassword, setShowSelfPassword] = useState(false);
+  const [selfPassSaving, setSelfPassSaving] = useState(false);
+  const [selfPassFeedback, setSelfPassFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Direct Staff/User Password Reset (Forgot Password Recovery)
+  const [usersList, setUsersList] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [targetNewPassword, setTargetNewPassword] = useState('');
+  const [showTargetPassword, setShowTargetPassword] = useState(false);
+  const [targetPassSaving, setTargetPassSaving] = useState(false);
+  const [targetPassFeedback, setTargetPassFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchInitialData = async () => {
       try {
-        const res = await api.get('/settings');
-        if (res.data?.settings) {
-          setSettings(res.data.settings);
+        const [settingsRes, usersRes] = await Promise.all([
+          api.get('/settings').catch(() => null),
+          api.get('/users').catch(() => null),
+        ]);
+
+        if (settingsRes?.data?.settings) {
+          setSettings(settingsRes.data.settings);
+        }
+        if (usersRes?.data?.users) {
+          setUsersList(usersRes.data.users);
+          if (usersRes.data.users.length > 0) {
+            setSelectedUserId(usersRes.data.users[0]._id || usersRes.data.users[0].id || '');
+          }
         }
       } catch (err) {
       } finally {
         setLoading(false);
       }
     };
-    fetchSettings();
+
+    fetchInitialData();
   }, []);
 
+  // Save General Platform Settings
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFeedback(null);
@@ -56,6 +96,85 @@ export default function AdminSettingsPage() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Direct Self Admin Password Change
+  const handleSelfPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSelfPassFeedback(null);
+
+    if (!selfNewPassword || selfNewPassword.length < 8) {
+      setSelfPassFeedback({ type: 'error', message: 'Password must be at least 8 characters long.' });
+      return;
+    }
+
+    if (selfNewPassword !== selfConfirmPassword) {
+      setSelfPassFeedback({ type: 'error', message: 'Passwords do not match.' });
+      return;
+    }
+
+    setSelfPassSaving(true);
+    try {
+      const res = await api.post('/auth/change-password', {
+        newPassword: selfNewPassword,
+      });
+
+      if (res.data?.success) {
+        setSelfPassFeedback({
+          type: 'success',
+          message: 'Your admin password has been updated successfully.',
+        });
+        setSelfNewPassword('');
+        setSelfConfirmPassword('');
+      }
+    } catch (err: any) {
+      setSelfPassFeedback({
+        type: 'error',
+        message: err.response?.data?.message || 'Failed to update admin password',
+      });
+    } finally {
+      setSelfPassSaving(false);
+    }
+  };
+
+  // Direct Staff/User Password Reset (Forgot Password Recovery)
+  const handleDirectUserPasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTargetPassFeedback(null);
+
+    if (!selectedUserId) {
+      setTargetPassFeedback({ type: 'error', message: 'Please select a user account to reset.' });
+      return;
+    }
+
+    if (!targetNewPassword || targetNewPassword.length < 8) {
+      setTargetPassFeedback({ type: 'error', message: 'New password must be at least 8 characters long.' });
+      return;
+    }
+
+    setTargetPassSaving(true);
+    try {
+      const targetUser = usersList.find((u) => (u._id || u.id) === selectedUserId);
+      const res = await api.post('/users/reset-password', {
+        userId: selectedUserId,
+        newPassword: targetNewPassword,
+      });
+
+      if (res.data?.success) {
+        setTargetPassFeedback({
+          type: 'success',
+          message: `Password for ${targetUser ? targetUser.email : 'selected user'} has been directly reset.`,
+        });
+        setTargetNewPassword('');
+      }
+    } catch (err: any) {
+      setTargetPassFeedback({
+        type: 'error',
+        message: err.response?.data?.message || 'Failed to reset user password',
+      });
+    } finally {
+      setTargetPassSaving(false);
     }
   };
 
@@ -89,10 +208,209 @@ export default function AdminSettingsPage() {
     <>
       <AdminHeader title="Platform Settings" />
 
-      <main className="flex-1 p-3 sm:p-6 max-w-4xl">
+      <main className="flex-1 p-3 sm:p-6 max-w-4xl space-y-8">
+        {/* ========================================================================= */}
+        {/* SECTION 1: DIRECT PASSWORD RESET & CREDENTIALS SECURITY                   */}
+        {/* ========================================================================= */}
+        <section className="rounded-lg border border-navy-200 bg-white p-6 shadow-xs space-y-6">
+          <div className="flex items-center gap-2.5 border-b border-rule pb-3">
+            <div className="h-8 w-8 rounded-full bg-navy-900 text-white flex items-center justify-center">
+              <KeyRound className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="font-serif text-lg font-bold text-navy-900 leading-tight">
+                Direct Password Reset & Account Security
+              </h2>
+              <p className="text-xs text-muted">
+                Instantly change your administrator password or recover access for any staff member directly without email links.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Panel 1: Reset Logged-in Admin Password */}
+            <div className="rounded-lg border border-rule/80 bg-wash/40 p-4 sm:p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldCheck className="h-4 w-4 text-navy-900" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-navy-900">
+                    Change My Admin Password
+                  </h3>
+                </div>
+                <p className="text-[11px] text-muted mb-4 leading-relaxed">
+                  Update credentials for current active session (<span className="font-semibold text-navy-900">{currentUser?.email}</span>).
+                </p>
+
+                {selfPassFeedback && (
+                  <div
+                    className={`flex items-start gap-2 rounded-md p-2.5 text-xs mb-3 ${
+                      selfPassFeedback.type === 'success'
+                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-900'
+                        : 'border border-red-200 bg-red-50 text-red-900'
+                    }`}
+                  >
+                    {selfPassFeedback.type === 'success' ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
+                    )}
+                    <span>{selfPassFeedback.message}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSelfPasswordChange} className="space-y-3 text-xs">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-navy-900">New Password</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowSelfPassword(!showSelfPassword)}
+                        className="text-[11px] text-gray-500 hover:text-navy-900 flex items-center gap-1"
+                      >
+                        {showSelfPassword ? (
+                          <>
+                            <EyeOff className="h-3 w-3" />
+                            <span>Hide</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3 w-3" />
+                            <span>Show</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <input
+                      type={showSelfPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Minimum 8 characters"
+                      value={selfNewPassword}
+                      onChange={(e) => setSelfNewPassword(e.target.value)}
+                      className="w-full rounded border border-rule px-3 py-2 text-ink focus:border-navy-900 focus:outline-none bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-navy-900 mb-1">Confirm New Password</label>
+                    <input
+                      type={showSelfPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Re-type new password"
+                      value={selfConfirmPassword}
+                      onChange={(e) => setSelfConfirmPassword(e.target.value)}
+                      className="w-full rounded border border-rule px-3 py-2 text-ink focus:border-navy-900 focus:outline-none bg-white"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={selfPassSaving}
+                    className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-md bg-navy-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-navy-800 disabled:opacity-50 transition-colors cursor-pointer"
+                  >
+                    <Lock className="h-3.5 w-3.5" />
+                    <span>{selfPassSaving ? 'Updating Password...' : 'Update My Password'}</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {/* Panel 2: Reset Any Staff / Forgotten User Password */}
+            <div className="rounded-lg border border-rule/80 bg-wash/40 p-4 sm:p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <UserCheck className="h-4 w-4 text-navy-900" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-navy-900">
+                    Direct Reset Any User Password
+                  </h3>
+                </div>
+                <p className="text-[11px] text-muted mb-4 leading-relaxed">
+                  Forgot password recovery: Administrator can assign a new password to any staff account instantly.
+                </p>
+
+                {targetPassFeedback && (
+                  <div
+                    className={`flex items-start gap-2 rounded-md p-2.5 text-xs mb-3 ${
+                      targetPassFeedback.type === 'success'
+                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-900'
+                        : 'border border-red-200 bg-red-50 text-red-900'
+                    }`}
+                  >
+                    {targetPassFeedback.type === 'success' ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
+                    )}
+                    <span>{targetPassFeedback.message}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleDirectUserPasswordReset} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block font-semibold text-navy-900 mb-1">Select User Account</label>
+                    <select
+                      value={selectedUserId}
+                      onChange={(e) => setSelectedUserId(e.target.value)}
+                      className="w-full rounded border border-rule px-3 py-2 text-ink focus:border-navy-900 focus:outline-none bg-white text-xs"
+                    >
+                      {usersList.map((u) => (
+                        <option key={u._id || u.id} value={u._id || u.id}>
+                          {u.name} — {u.email} ({u.role.toUpperCase()})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-navy-900">Assign New Password</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowTargetPassword(!showTargetPassword)}
+                        className="text-[11px] text-gray-500 hover:text-navy-900 flex items-center gap-1"
+                      >
+                        {showTargetPassword ? (
+                          <>
+                            <EyeOff className="h-3 w-3" />
+                            <span>Hide</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3 w-3" />
+                            <span>Show</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <input
+                      type={showTargetPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Minimum 8 characters"
+                      value={targetNewPassword}
+                      onChange={(e) => setTargetNewPassword(e.target.value)}
+                      className="w-full rounded border border-rule px-3 py-2 text-ink focus:border-navy-900 focus:outline-none bg-white"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={targetPassSaving}
+                    className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-md bg-navy-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-navy-800 disabled:opacity-50 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    <span>{targetPassSaving ? 'Resetting Password...' : 'Directly Reset User Password'}</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* SECTION 2: GENERAL PUBLICATION IDENTITY & EDITORIAL SETTINGS              */}
+        {/* ========================================================================= */}
         {feedback && (
           <div
-            className={`flex items-center gap-2 rounded-md p-3 text-xs mb-6 ${
+            className={`flex items-center gap-2 rounded-md p-3 text-xs ${
               feedback.type === 'success'
                 ? 'border border-emerald-200 bg-emerald-50 text-emerald-900'
                 : 'border border-red-200 bg-red-50 text-red-900'
@@ -199,7 +517,7 @@ export default function AdminSettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-md bg-navy-900 px-5 py-2.5 text-xs font-semibold text-white hover:bg-navy-800 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-2 rounded-md bg-navy-900 px-5 py-2.5 text-xs font-semibold text-white hover:bg-navy-800 disabled:opacity-50 transition-colors cursor-pointer"
           >
             <Save className="h-4 w-4" />
             <span>{saving ? 'Saving...' : 'Save Settings'}</span>
