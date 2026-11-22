@@ -3,6 +3,7 @@ name: Deploy Frontend
 on:
   push:
     branches: [master]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -13,13 +14,19 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: root
+          port: 22
           key: ${{ secrets.VPS_SSH_KEY }}
           command_timeout: 20m
           script: |
             set -e
             cd /var/www/nme/frontend
-            git pull origin master
+            git fetch origin master
+            git reset --hard origin/master
             npm ci
             npm run build
-            pm2 reload nme-frontend --update-env
+            pm2 describe nme-frontend > /dev/null 2>&1 \
+              && pm2 reload nme-frontend --update-env \
+              || pm2 start ecosystem.config.cjs
             pm2 save
+            sleep 5
+            curl -fI http://127.0.0.1:3000
