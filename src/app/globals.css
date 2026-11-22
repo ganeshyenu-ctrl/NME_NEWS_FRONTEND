@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-navy-950: #071426;
+  --color-navy-900: #0b1f3a;
+  --color-navy-800: #12305a;
+  --color-navy-700: #1b4379;
+  --color-navy-100: #dfe7f2;
+  --color-navy-50: #f2f5fa;
+  --color-ink: #23272e;
+  --color-muted: #5d6673;
+  --color-rule: #dcdfe4;
+  --color-wash: #f6f7f9;
+  --color-signal: #9a2b1f;
+}
+
+body {
+  color: var(--color-ink);
+  background-color: #ffffff;
+  font-family: 'Public Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .font-serif {
+  font-family: 'Source Serif 4', Georgia, serif;
+}
+
+/* Custom scrollbar for horizontal category bar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom styled native select & option elements as universal fallback */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%235d6673' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.65rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25em 1.25em;
+  padding-right: 2.25rem;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: all 0.15s ease-in-out;
+}
+
+select:hover {
+  border-color: #0b1f3a;
+}
+
+select:focus {
+  border-color: #0b1f3a;
+  outline: none;
+  box-shadow: 0 0 0 1px #0b1f3a;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #0b1f3a;
+  font-size: 0.8125rem;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+select option:checked {
+  background-color: #dfe7f2 !important;
+  color: #0b1f3a !important;
+  font-weight: 600;
+}
+
+/* Custom thin scrollbar for styled dropdowns */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f6f7f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
