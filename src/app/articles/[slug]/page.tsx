@@ -120,7 +120,6 @@ export default async function ArticleDetailPage({ params }: Props) {
   const categorySlug = catObj?.slug || 'maritime-news';
   const categoryName = catObj?.name || currentArticle.categoryName || 'Maritime News';
   const authorName = (currentArticle.author as any)?.name || currentArticle.authorName || 'Staff Correspondent';
-  const authorRole = (currentArticle.author as any)?.role || (currentArticle as any).authorRole || 'Editorial Staff';
   const authorAvatar = (currentArticle.author as any)?.avatar || '';
 
   const articleFullUrl = `https://nmepublications.com/articles/${currentArticle.slug}`;
@@ -175,12 +174,7 @@ export default async function ArticleDetailPage({ params }: Props) {
                 </div>
               )}
               <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-navy-900">{authorName}</p>
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider bg-navy-50 text-navy-700 border border-navy-100">
-                    {authorRole}
-                  </span>
-                </div>
+                <p className="font-semibold text-navy-900">{authorName}</p>
                 <div className="flex items-center gap-2 text-[11px] mt-0.5">
                   <span>
                     {currentArticle.publishedAt
