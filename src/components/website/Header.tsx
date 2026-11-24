@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/store/hooks';
@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Menu,
   X,
+  ChevronLeft,
   ChevronRight,
   Mail,
   ArrowRight,
@@ -22,6 +23,47 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const { categories } = useAppSelector((state) => state.categories);
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { settings } = useAppSelector((state) => state.settings);
+
+  const publicationName = settings?.publicationName || 'NME';
+  const tagline = settings?.tagline || 'Independent Perspectives. Informed Maritime Decisions.';
+
+  // Horizontal category bar scroll reference & arrow indicators
+  const navRef = useRef<HTMLUListElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollButtons = () => {
+    if (navRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = navRef.current;
+      setCanScrollLeft(scrollLeft > 4);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+    }
+  };
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+
+    updateScrollButtons();
+    const timer = setTimeout(updateScrollButtons, 100);
+
+    nav.addEventListener('scroll', updateScrollButtons, { passive: true });
+    window.addEventListener('resize', updateScrollButtons);
+
+    return () => {
+      clearTimeout(timer);
+      nav.removeEventListener('scroll', updateScrollButtons);
+      window.removeEventListener('resize', updateScrollButtons);
+    };
+  }, [categories]);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (navRef.current) {
+      const scrollAmount = direction === 'left' ? -260 : 260;
+      navRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   // Prevent background scrolling when mobile sidebar is open
   useEffect(() => {
@@ -55,7 +97,7 @@ export default function Header() {
       <div className="hidden md:block border-b border-rule/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-2 text-xs text-muted">
           <span>{currentDateStr}</span>
-          <span className="hidden lg:inline">Independent Perspectives. Informed Maritime Decisions.</span>
+          <span className="hidden lg:inline">{tagline}</span>
           <div className="flex items-center gap-4">
             <Link href="/newsletter" className="font-semibold text-navy-900 hover:underline">
               Subscribe
@@ -86,18 +128,16 @@ export default function Header() {
       <div>
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:py-6">
           <Link
-            aria-label="Navigating Marine Excellence home"
+            aria-label={`${publicationName} home`}
             href="/"
             onClick={() => setMobileMenuOpen(false)}
           >
             <span className="inline-flex items-baseline gap-2.5 sm:gap-3">
               <span className="font-serif font-bold tracking-tight text-navy-900 text-3xl sm:text-4xl md:text-5xl">
-                NME
+                {publicationName}
               </span>
-              <span className="border-l border-navy-900 pl-2.5 sm:pl-3 font-sans font-semibold uppercase text-navy-900 text-[0.6rem] tracking-[0.22em] sm:text-xs leading-tight">
-                Navigating
-                <br />
-                Marine Excellence
+              <span className="border-l border-navy-900 pl-2.5 sm:pl-3 font-sans font-semibold uppercase text-navy-900 text-[0.6rem] tracking-[0.22em] sm:text-xs leading-tight max-w-[170px] line-clamp-2">
+                {tagline}
               </span>
             </span>
           </Link>
@@ -134,25 +174,59 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Category Navigation Bar */}
-      <nav aria-label="Sections" className="border-t border-rule">
-        <ul className="mx-auto flex max-w-6xl gap-x-6 overflow-x-auto px-5 text-[0.8125rem] font-semibold text-navy-900 no-scrollbar">
-          <li className="shrink-0">
-            <Link className="block py-3 hover:underline hover:underline-offset-4" href="/news">
-              Latest
-            </Link>
-          </li>
-          {categories.map((cat) => (
-            <li key={cat._id} className="shrink-0">
-              <Link
-                className="block py-3 hover:underline hover:underline-offset-4 whitespace-nowrap"
-                href={`/category/${cat.slug}`}
+      {/* Category Navigation Bar with Scroll Arrows */}
+      <nav aria-label="Sections" className="border-t border-rule relative bg-white">
+        <div className="mx-auto max-w-6xl relative flex items-center">
+          {/* Left Arrow Button with subtle gradient fade */}
+          {canScrollLeft && (
+            <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center bg-gradient-to-r from-white via-white/95 to-transparent pr-4 pl-1">
+              <button
+                type="button"
+                onClick={() => handleScroll('left')}
+                aria-label="Scroll categories left"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white border border-rule/90 shadow-xs text-navy-900 hover:bg-navy-50 hover:border-navy-900 transition-all cursor-pointer active:scale-95"
               >
-                {cat.name}
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Categories Horizontal Scroll List */}
+          <ul
+            ref={navRef}
+            className="flex w-full gap-x-6 overflow-x-auto px-5 text-[0.8125rem] font-semibold text-navy-900 no-scrollbar scroll-smooth"
+          >
+            <li className="shrink-0">
+              <Link className="block py-3 hover:underline hover:underline-offset-4" href="/news">
+                Latest
               </Link>
             </li>
-          ))}
-        </ul>
+            {categories.map((cat) => (
+              <li key={cat._id} className="shrink-0">
+                <Link
+                  className="block py-3 hover:underline hover:underline-offset-4 whitespace-nowrap"
+                  href={`/category/${cat.slug}`}
+                >
+                  {cat.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {/* Right Arrow Button with subtle gradient fade */}
+          {canScrollRight && (
+            <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center bg-gradient-to-l from-white via-white/95 to-transparent pl-4 pr-1">
+              <button
+                type="button"
+                onClick={() => handleScroll('right')}
+                aria-label="Scroll categories right"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white border border-rule/90 shadow-xs text-navy-900 hover:bg-navy-50 hover:border-navy-900 transition-all cursor-pointer active:scale-95"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Mobile Slide-Out Sidebar Backdrop */}

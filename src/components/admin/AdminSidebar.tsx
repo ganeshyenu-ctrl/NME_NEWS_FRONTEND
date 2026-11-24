@@ -20,6 +20,7 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  UserCheck,
 } from 'lucide-react';
 
 export default function AdminSidebar() {
@@ -39,6 +40,7 @@ export default function AdminSidebar() {
     { label: 'Articles', href: '/admin/articles', icon: FileText },
     { label: 'Create Article', href: '/admin/articles/create', icon: SquarePen },
     { label: 'Media Library', href: '/admin/media', icon: ImageIcon },
+    { label: 'My Profile', href: '/admin/profile', icon: UserCheck },
     ...(user?.role === 'admin' || user?.role === 'editor'
       ? [{ label: 'Categories', href: '/admin/categories', icon: FolderTree }]
       : []),
@@ -141,12 +143,17 @@ export default function AdminSidebar() {
 
         {isCollapsed ? (
           <div className="flex flex-col items-center gap-2 py-2">
-            <div
-              className="h-8 w-8 rounded-full bg-navy-800 border border-white/20 flex items-center justify-center font-bold text-white text-xs cursor-default"
-              title={`${user?.name || 'Administrator'} (${user?.role || 'admin'})`}
+            <Link
+              href="/admin/profile"
+              className="h-8 w-8 rounded-full bg-navy-800 border border-white/20 flex items-center justify-center font-bold text-white text-xs hover:border-white transition-all overflow-hidden"
+              title={`View Profile: ${user?.name || 'Administrator'} (${user?.role || 'admin'})`}
             >
-              {(user?.name || 'A')[0]}
-            </div>
+              {user?.avatar ? (
+                <img src={user.avatar} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                (user?.name || 'A')[0]
+              )}
+            </Link>
             <button
               onClick={handleLogout}
               className="text-navy-100/60 hover:text-white p-1.5 rounded hover:bg-white/10 transition-colors"
@@ -157,14 +164,24 @@ export default function AdminSidebar() {
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2.5 rounded-md p-2 bg-white/5">
-            <div className="h-8 w-8 rounded-full bg-navy-800 border border-white/20 flex items-center justify-center font-bold text-white text-xs shrink-0">
-              {(user?.name || 'A')[0]}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate">{user?.name || 'Administrator'}</p>
+          <div className="flex items-center gap-2.5 rounded-md p-2 bg-white/5 hover:bg-white/10 transition-colors">
+            <Link
+              href="/admin/profile"
+              className="h-8 w-8 rounded-full bg-navy-800 border border-white/20 flex items-center justify-center font-bold text-white text-xs shrink-0 overflow-hidden hover:border-white transition-all"
+              title="View & Edit Profile"
+            >
+              {user?.avatar ? (
+                <img src={user.avatar} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                (user?.name || 'A')[0]
+              )}
+            </Link>
+            <Link href="/admin/profile" className="flex-1 min-w-0 group" title="View & Edit Profile">
+              <p className="text-xs font-semibold text-white truncate group-hover:text-blue-300 transition-colors">
+                {user?.name || 'Administrator'}
+              </p>
               <p className="text-[10px] text-navy-100/60 uppercase tracking-wider">{user?.role || 'admin'}</p>
-            </div>
+            </Link>
             <button
               onClick={handleLogout}
               className="text-navy-100/60 hover:text-white p-1 rounded hover:bg-white/10 transition-colors shrink-0"

@@ -74,6 +74,14 @@ const authSlice = createSlice({
     clearAuthError: (state) => {
       state.error = null;
     },
+    updateUserSession: (state, action: PayloadAction<Partial<User>>) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('nme_user', JSON.stringify(state.user));
+        }
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -100,5 +108,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { restoreSession, clearAuthError } = authSlice.actions;
+export const { restoreSession, clearAuthError, updateUserSession } = authSlice.actions;
 export default authSlice.reducer;

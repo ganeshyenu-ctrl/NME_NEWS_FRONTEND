@@ -7,6 +7,7 @@ export interface User {
   canPublish: boolean;
   status: 'active' | 'inactive';
   avatar?: string;
+  bio?: string;
   lastLogin?: string;
   createdAt?: string;
 }

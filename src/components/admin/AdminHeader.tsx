@@ -13,6 +13,7 @@ interface Props {
 
 export default function AdminHeader({ title, actions }: Props) {
   const { isConnected } = useAppSelector((state) => state.socket);
+  const { user } = useAppSelector((state) => state.auth);
   const { isCollapsed, toggleCollapse, isMobile } = useAdminSidebar();
 
   return (
@@ -44,6 +45,22 @@ export default function AdminHeader({ title, actions }: Props) {
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {actions}
+
+        <Link
+          href="/admin/profile"
+          className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-wash/60 px-2.5 py-1 text-xs font-semibold text-navy-900 hover:bg-navy-50 hover:border-navy-900 transition-colors"
+          title="View & Edit My Profile"
+        >
+          <div className="h-5 w-5 rounded-full bg-navy-900 text-white flex items-center justify-center text-[10px] font-bold overflow-hidden">
+            {user?.avatar ? (
+              <img src={user.avatar} alt="Avatar" className="h-full w-full object-cover" />
+            ) : (
+              (user?.name || 'A')[0]
+            )}
+          </div>
+          <span className="hidden sm:inline truncate max-w-[120px]">{user?.name || 'Profile'}</span>
+        </Link>
+
         <Link
           href="/"
           target="_blank"

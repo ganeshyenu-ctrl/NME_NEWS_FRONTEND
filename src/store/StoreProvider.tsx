@@ -6,6 +6,7 @@ import { store } from './index';
 import { restoreSession } from './slices/authSlice';
 import { fetchCategories } from './slices/categoriesSlice';
 import { fetchHomepageHighlights, fetchPublicArticles } from './slices/articlesSlice';
+import { fetchSettings, setSettings } from './slices/settingsSlice';
 import { getSocket } from '@/lib/socket';
 import {
   setSocketConnected,
@@ -18,8 +19,9 @@ function SocketInitializer({ children }: { children: React.ReactNode }) {
     // 1. Restore auth session
     store.dispatch(restoreSession());
 
-    // 2. Fetch categories globally
+    // 2. Fetch categories and platform settings globally
     store.dispatch(fetchCategories());
+    store.dispatch(fetchSettings());
 
     // 3. Connect socket & register global events
     const socket = getSocket();
@@ -49,6 +51,10 @@ function SocketInitializer({ children }: { children: React.ReactNode }) {
       store.dispatch(fetchCategories());
     };
 
+    const onSettingsUpdated = (data: any) => {
+      store.dispatch(setSettings(data));
+    };
+
     const onEditorial = (event: any) => {
       store.dispatch(addEditorialEvent(event));
     };
@@ -58,6 +64,7 @@ function SocketInitializer({ children }: { children: React.ReactNode }) {
     socket.on('breaking_news_alert', onBreaking);
     socket.on('new_article_published', onNewArticle);
     socket.on('categories_updated', onCategoriesUpdated);
+    socket.on('settings_updated', onSettingsUpdated);
     socket.on('editorial_activity', onEditorial);
 
     if (socket.connected) {

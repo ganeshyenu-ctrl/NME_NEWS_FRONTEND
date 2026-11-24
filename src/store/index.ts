@@ -3,6 +3,7 @@ import authReducer from './slices/authSlice';
 import articlesReducer from './slices/articlesSlice';
 import categoriesReducer from './slices/categoriesSlice';
 import socketReducer from './slices/socketSlice';
+import settingsReducer from './slices/settingsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     articles: articlesReducer,
     categories: categoriesReducer,
     socket: socketReducer,
+    settings: settingsReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
 });

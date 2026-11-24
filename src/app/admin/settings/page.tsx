@@ -5,7 +5,8 @@ import Link from 'next/link';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { api } from '@/lib/api';
 import { PlatformSettings, User } from '@/types';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setSettings as setReduxSettings } from '@/store/slices/settingsSlice';
 import {
   Save,
   CheckCircle2,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 
 export default function AdminSettingsPage() {
+  const dispatch = useAppDispatch();
   const { user: currentUser } = useAppSelector((state) => state.auth);
 
   // General Settings State
@@ -87,7 +89,10 @@ export default function AdminSettingsPage() {
     try {
       const res = await api.put('/settings', settings);
       if (res.data?.success) {
-        setFeedback({ type: 'success', message: 'Platform settings saved and applied.' });
+        if (res.data.settings) {
+          dispatch(setReduxSettings(res.data.settings));
+        }
+        setFeedback({ type: 'success', message: 'Platform settings saved and applied across all public pages.' });
       }
     } catch (err: any) {
       setFeedback({

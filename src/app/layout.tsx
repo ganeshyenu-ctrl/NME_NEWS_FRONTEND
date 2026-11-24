@@ -15,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en-GB" className="h-full">
-      <body className="min-h-full flex flex-col bg-white text-ink">
+      <body className="min-h-full flex flex-col bg-white text-ink" suppressHydrationWarning>
         <StoreProvider>
           <BreakingNewsBanner />
           {children}
