@@ -196,7 +196,7 @@ function NewsListingContent() {
                   </div>
 
                   <div className="border-t border-rule/60 p-5 pt-3 flex items-center justify-between text-[11px] text-muted">
-                    <span>{art.authorName || 'Staff'}</span>
+                    <span>{(art.author as any)?.name || art.authorName || 'Staff'}</span>
                     <div className="flex items-center gap-2">
                       <span>
                         {art.publishedAt

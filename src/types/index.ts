@@ -109,4 +109,7 @@ export interface DashboardStats {
   scheduledCount: number;
   monthlyVisitors: number;
   pageViews: number;
+  todayViews?: number;
+  todayVisitors?: number;
+  liveVisitors?: number;
 }

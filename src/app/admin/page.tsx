@@ -48,6 +48,14 @@ export default function AdminDashboardPage() {
     // Join CRM socket room for real-time editorial updates
     const socket = getSocket();
     socket.emit('join_crm');
+
+    socket.on('live_visitors_update', (data: { liveVisitors: number }) => {
+      setStats((prev: any) => (prev ? { ...prev, liveVisitors: data.liveVisitors } : prev));
+    });
+
+    return () => {
+      socket.off('live_visitors_update');
+    };
   }, []);
 
   return (
@@ -103,16 +111,47 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-rule bg-white p-5">
-            <div className="flex items-center justify-between text-muted mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">Website Visitors</span>
-              <Users className="h-4 w-4 text-navy-700" />
-            </div>
-            <div className="font-serif text-3xl font-bold text-navy-900">
-              {stats?.monthlyVisitors ? stats.monthlyVisitors.toLocaleString() : '38,400'}
-            </div>
-            <p className="mt-1 text-[11px] text-emerald-700 font-medium">+14.2% month-on-month</p>
-          </div>
+          {/* Website Live Visitors & Real Reads */}
+          {(() => {
+            // Filter out old backend dummy numbers (142900, 38400) and compute real database views
+            const calculatedViews = mostRead.reduce((acc, art) => acc + (art.views || 0), 0);
+            const totalReads =
+              stats?.pageViews && stats.pageViews !== 142900 && stats.pageViews !== 38400
+                ? stats.pageViews
+                : calculatedViews;
+
+            return (
+              <div className="rounded-lg border border-rule bg-white p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-muted mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider">Live Website Visitors</span>
+                    <Users className="h-4 w-4 text-navy-700" />
+                  </div>
+                  <div className="flex items-baseline gap-2.5">
+                    <div className="font-serif text-3xl font-bold text-navy-900">
+                      {stats?.liveVisitors ?? 1}
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                      </span>
+                      <span>Active Now</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2.5 border-t border-rule/60 flex items-center justify-between text-[11px] text-muted">
+                  <span className="font-medium text-navy-900">
+                    {totalReads.toLocaleString()} total reads
+                  </span>
+                  <span>
+                    {stats?.todayViews ?? 0} active today
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
         </section>
 
         {/* Two-Column Layout */}

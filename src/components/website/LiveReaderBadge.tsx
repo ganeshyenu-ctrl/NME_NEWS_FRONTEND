@@ -34,6 +34,8 @@ export default function LiveReaderBadge({ articleSlug }: Props) {
     };
   }, [articleSlug, dispatch]);
 
+  const displayCount = Math.max(1, activeReaders);
+
   return (
     <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-900">
       <span className="relative flex h-2 w-2">
@@ -41,7 +43,7 @@ export default function LiveReaderBadge({ articleSlug }: Props) {
         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
       </span>
       <Users className="h-3 w-3 text-emerald-700 ml-0.5" />
-      <span>{activeReaders} {activeReaders === 1 ? 'reader online now' : 'readers online now'}</span>
+      <span>{displayCount} {displayCount === 1 ? 'reader active now' : 'readers active now'}</span>
     </div>
   );
 }

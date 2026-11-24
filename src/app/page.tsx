@@ -159,7 +159,9 @@ export default function HomePage() {
                 </div>
 
                 <div className="mt-6 flex items-center gap-3 text-xs text-muted">
-                  <span className="font-medium text-navy-900">{leadArticle.authorName || 'Staff'}</span>
+                  <span className="font-medium text-navy-900">
+                    {(leadArticle.author as any)?.name || leadArticle.authorName || 'Staff'}
+                  </span>
                   <span>•</span>
                   <span>
                     {leadArticle.publishedAt
@@ -230,7 +232,9 @@ export default function HomePage() {
                     </div>
 
                     <div className="mt-4 flex items-center gap-2 text-[11px] text-muted">
-                      <span className="font-medium text-navy-900">{art.authorName || 'Staff'}</span>
+                      <span className="font-medium text-navy-900">
+                        {(art.author as any)?.name || art.authorName || 'Staff'}
+                      </span>
                       <span>•</span>
                       <span>{art.readTime}</span>
                     </div>
@@ -360,7 +364,9 @@ export default function HomePage() {
                     </div>
 
                     <div className="mt-4 flex items-center gap-2 text-[11px] text-muted">
-                      <span className="font-medium text-navy-900">{art.authorName || 'Staff'}</span>
+                      <span className="font-medium text-navy-900">
+                        {(art.author as any)?.name || art.authorName || 'Staff'}
+                      </span>
                       <span>•</span>
                       <span>{art.readTime || '3 min read'}</span>
                     </div>

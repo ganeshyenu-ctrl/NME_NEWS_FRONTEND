@@ -66,7 +66,7 @@ export default function AdminProfilePage() {
     // Fetch user's authored articles count
     const fetchUserStats = async () => {
       try {
-        const res = await api.get('/articles', { params: { limit: 1 } });
+        const res = await api.get('/articles/admin/list', { params: { limit: 1 } });
         if (res.data?.total !== undefined) {
           setAuthoredCount(res.data.total);
         }
