@@ -128,16 +128,18 @@ export default function Header() {
       <div>
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:py-6">
           <Link
-            aria-label={`${publicationName} home`}
+            aria-label="NME home"
             href="/"
             onClick={() => setMobileMenuOpen(false)}
           >
             <span className="inline-flex items-baseline gap-2.5 sm:gap-3">
               <span className="font-serif font-bold tracking-tight text-navy-900 text-3xl sm:text-4xl md:text-5xl">
-                {publicationName}
+                NME
               </span>
-              <span className="border-l border-navy-900 pl-2.5 sm:pl-3 font-sans font-semibold uppercase text-navy-900 text-[0.6rem] tracking-[0.22em] sm:text-xs leading-tight max-w-[170px] line-clamp-2">
-                {tagline}
+              <span className="border-l border-navy-900 pl-2.5 sm:pl-3 font-sans font-semibold uppercase text-navy-900 text-[0.6rem] tracking-[0.22em] sm:text-xs leading-tight whitespace-nowrap">
+                Navigating
+                <br />
+                Marine Excellence
               </span>
             </span>
           </Link>

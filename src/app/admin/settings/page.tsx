@@ -303,22 +303,33 @@ export default function AdminSettingsPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Publication Identity */}
+          {/* Publication Identity & Header Notices */}
           <section className="rounded-lg border border-rule bg-white p-6 space-y-4">
-            <h2 className="font-serif text-lg font-bold text-navy-900 border-b border-rule pb-2">
-              Publication Identity
-            </h2>
+            <div>
+              <h2 className="font-serif text-lg font-bold text-navy-900 border-b border-rule pb-2">
+                Header Notice &amp; Contact Settings
+              </h2>
+              <p className="text-xs text-muted mt-2">
+                Configure the top bar headline notice and official communication channels. (The main brand logo &ldquo;NME | NAVIGATING MARINE EXCELLENCE&rdquo; is fixed).
+              </p>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="block font-semibold text-navy-900 mb-1">Publication Name</label>
+              <div className="sm:col-span-2">
+                <label className="block font-semibold text-navy-900 mb-1">
+                  Top Header Tagline / Headline Notice
+                </label>
                 <input
                   type="text"
                   required
-                  value={settings.publicationName}
-                  onChange={(e) => setSettings({ ...settings, publicationName: e.target.value })}
+                  placeholder="Independent Perspectives. Informed Maritime Decisions."
+                  value={settings.tagline}
+                  onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
                   className="w-full rounded border border-rule px-3 py-2 text-ink focus:border-navy-900 focus:outline-none"
                 />
+                <span className="text-[11px] text-muted mt-1 block">
+                  Controls the marked headline text in the top navigation bar.
+                </span>
               </div>
 
               <div>
@@ -332,17 +343,7 @@ export default function AdminSettingsPage() {
                 />
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block font-semibold text-navy-900 mb-1">Publication Tagline</label>
-                <input
-                  type="text"
-                  value={settings.tagline}
-                  onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
-                  className="w-full rounded border border-rule px-3 py-2 text-ink focus:border-navy-900 focus:outline-none"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
+              <div>
                 <label className="block font-semibold text-navy-900 mb-1">LinkedIn Company URL</label>
                 <input
                   type="url"

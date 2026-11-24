@@ -25,10 +25,10 @@ export default function Footer() {
           <div className="md:col-span-2 space-y-4">
             <div className="inline-flex items-baseline gap-3">
               <span className="font-serif font-bold text-3xl tracking-tight text-white">
-                {publicationName}
+                NME
               </span>
               <span className="border-l border-white/20 pl-3 font-sans font-semibold uppercase text-xs tracking-wider text-navy-100">
-                {tagline}
+                Navigating Marine Excellence
               </span>
             </div>
 
@@ -61,7 +61,7 @@ export default function Footer() {
             </div>
 
             <div className="pt-2 text-xs text-navy-100/50">
-              © {new Date().getFullYear()} {publicationName}. All rights reserved.
+              © {new Date().getFullYear()} Navigating Marine Excellence. All rights reserved.
             </div>
           </div>
 
