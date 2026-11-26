@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import { useAppSelector } from '@/store/hooks';
 import { SECURE_ADMIN_LOGIN_PATH } from '@/config/routes';
 import {
@@ -26,8 +27,8 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [readStats, setReadStats] = useState({
-    totalReads: '2,338',
-    activeToday: '738',
+    totalReads: '—',
+    activeToday: '—',
   });
   const { categories } = useAppSelector((state) => state.categories);
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
@@ -35,29 +36,68 @@ export default function Header() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const applyStats = (totalReadsVal?: number, activeTodayVal?: number) => {
+      if (!isActive) return;
+      if (typeof totalReadsVal === 'number' && typeof activeTodayVal === 'number') {
+        setReadStats({
+          totalReads: totalReadsVal.toLocaleString(),
+          activeToday: activeTodayVal.toLocaleString(),
+        });
+      }
+    };
 
     const fetchReadStats = async () => {
       try {
-        const res = await api.get('/articles/admin/stats').catch(() => null);
+        const res = await api.get('/articles/public-stats').catch(async (err) => {
+          if (err?.response?.status === 404 && isAuthenticated) {
+            return api.get('/articles/admin/stats').catch(() => null);
+          }
+          return null;
+        });
+
         if (res?.data?.success && res.data.stats) {
           const s = res.data.stats;
-          const mostRead = res.data.mostRead || [];
-          const calculatedViews = mostRead.reduce((acc: number, art: any) => acc + (art.views || 0), 0);
-          const totalReads =
-            s.pageViews && s.pageViews !== 142900 && s.pageViews !== 38400
-              ? s.pageViews
-              : (calculatedViews || 2338);
-          const activeToday = s.todayViews || 738;
-          setReadStats({
-            totalReads: Number(totalReads).toLocaleString(),
-            activeToday: Number(activeToday).toLocaleString(),
-          });
+          const totalReads = Number(s.totalReads ?? s.pageViews ?? 0);
+          const activeToday = Number(s.activeToday ?? s.todayViews ?? 0);
+          applyStats(totalReads, activeToday);
         }
       } catch {}
     };
 
     fetchReadStats();
-  }, []);
+
+    // Keep Socket.io connected for all visitors (logged in or logged out)
+    const socket = getSocket();
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleStatsUpdate = (data: { totalReads?: number; activeToday?: number }) => {
+      if (typeof data?.totalReads === 'number' && typeof data?.activeToday === 'number') {
+        applyStats(data.totalReads, data.activeToday);
+      } else {
+        fetchReadStats();
+      }
+    };
+
+    const handleConnect = () => {
+      fetchReadStats();
+    };
+
+    socket.on('readership_stats_updated', handleStatsUpdate);
+    socket.on('connect', handleConnect);
+
+    return () => {
+      isActive = false;
+      socket.off('readership_stats_updated', handleStatsUpdate);
+      socket.off('connect', handleConnect);
+    };
+  }, [isAuthenticated]);
 
   const publicationName = settings?.publicationName || 'NME';
   const tagline = settings?.tagline || 'Independent Perspectives. Informed Maritime Decisions.';
