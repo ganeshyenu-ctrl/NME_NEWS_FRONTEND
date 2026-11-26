@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import Header from '@/components/website/Header';
 import Footer from '@/components/website/Footer';
-import LiveReaderBadge from '@/components/website/LiveReaderBadge';
 import CommentSection from '@/components/website/CommentSection';
 import ArticleShareButton from '@/components/website/ArticleShareButton';
+import AdBanner from '@/components/website/AdBanner';
 import { Article } from '@/types';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Flame, MessageSquare } from 'lucide-react';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -124,12 +124,33 @@ export default async function ArticleDetailPage({ params }: Props) {
 
   const articleFullUrl = `https://nmepublications.com/articles/${currentArticle.slug}`;
 
+  // Fetch comment count for this article
+  const apiUrl =
+    process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'https://nmepublications.com/api';
+
+  let commentCount = (currentArticle as any).commentCount ?? 0;
+  if (currentArticle._id) {
+    try {
+      const cRes = await fetch(`${apiUrl}/comments/${currentArticle._id}`, {
+        next: { revalidate: 15 },
+      });
+      if (cRes.ok) {
+        const cData = await cRes.json();
+        if (Array.isArray(cData?.comments)) {
+          commentCount = cData.comments.length;
+        }
+      }
+    } catch {}
+  }
+
   return (
     <>
       <Header />
       <main className="flex-1 bg-white py-8 sm:py-10">
         <article className="mx-auto max-w-4xl px-5">
-          {/* Breadcrumbs & Live Readers */}
+          {/* Breadcrumbs & Live Readers / Views / Comments */}
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-rule pb-4 mb-6">
             <nav aria-label="Breadcrumb" className="text-xs text-muted">
               <Link href="/" className="hover:text-navy-900 hover:underline">
@@ -144,8 +165,24 @@ export default async function ArticleDetailPage({ params }: Props) {
               </Link>
             </nav>
 
-            {/* Socket.io Live Reader Counter */}
-            <LiveReaderBadge articleSlug={currentArticle.slug} />
+            {/* Views & Comments Badges (Fire icon + view count, Comment icon + count, no text) */}
+            <div className="flex items-center gap-2">
+              <div
+                title={`${currentArticle.views || 0} views`}
+                className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-xs font-bold text-amber-900 shadow-xs"
+              >
+                <Flame className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                <span>{currentArticle.views || 0}</span>
+              </div>
+              <a
+                href="#comments"
+                title={`${commentCount} comments`}
+                className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200/80 px-2.5 py-1 text-xs font-bold text-navy-900 hover:bg-sky-100 transition-colors shadow-xs"
+              >
+                <MessageSquare className="h-3.5 w-3.5 text-navy-700" />
+                <span>{commentCount}</span>
+              </a>
+            </div>
           </div>
 
           {/* Headline & Subtitle */}
@@ -175,7 +212,7 @@ export default async function ArticleDetailPage({ params }: Props) {
               )}
               <div>
                 <p className="font-semibold text-navy-900">{authorName}</p>
-                <div className="flex items-center gap-2 text-[11px] mt-0.5">
+                <div className="flex items-center gap-2 text-[11px] mt-0.5 flex-wrap">
                   <span>
                     {currentArticle.publishedAt
                       ? new Date(currentArticle.publishedAt).toLocaleDateString('en-GB', {
@@ -187,6 +224,23 @@ export default async function ArticleDetailPage({ params }: Props) {
                   </span>
                   <span>•</span>
                   <span>{currentArticle.readTime || '3 min read'}</span>
+                  <span>•</span>
+                  <span
+                    className="inline-flex items-center gap-1 font-semibold text-amber-700"
+                    title={`${currentArticle.views || 0} views`}
+                  >
+                    <Flame className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                    <span>{currentArticle.views || 0}</span>
+                  </span>
+                  <span>•</span>
+                  <a
+                    href="#comments"
+                    className="inline-flex items-center gap-1 font-semibold text-navy-800 hover:text-navy-950 transition-colors"
+                    title={`${commentCount} comments`}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 text-navy-600" />
+                    <span>{commentCount}</span>
+                  </a>
                 </div>
               </div>
             </div>
@@ -219,6 +273,9 @@ export default async function ArticleDetailPage({ params }: Props) {
             className="prose prose-navy max-w-none text-base sm:text-lg leading-relaxed text-ink space-y-4"
             dangerouslySetInnerHTML={{ __html: currentArticle.content }}
           />
+
+          {/* In-Article Sponsored Partner Insight */}
+          <AdBanner placement="article_inline" />
 
           {/* Tags */}
           {currentArticle.tags && currentArticle.tags.length > 0 && (

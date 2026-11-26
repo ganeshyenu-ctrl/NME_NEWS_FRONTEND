@@ -4,16 +4,19 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import Header from '@/components/website/Header';
 import Footer from '@/components/website/Footer';
+import LeadStoryCarousel from '@/components/website/LeadStoryCarousel';
+import AdBanner from '@/components/website/AdBanner';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchHomepageHighlights, fetchPublicArticles } from '@/store/slices/articlesSlice';
 import { fetchCategories } from '@/store/slices/categoriesSlice';
+import { getStoredLeadStoryIds } from '@/lib/leadStoryStorage';
 import { api } from '@/lib/api';
-import { ArrowRight, Flame, Clock, Newspaper, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowRight, Flame, Clock, Newspaper, CheckCircle2, AlertCircle, MessageSquare } from 'lucide-react';
 import { Article } from '@/types';
 
 export default function HomePage() {
   const dispatch = useAppDispatch();
-  const { leadArticle, breakingNews, trending, articles, loading } = useAppSelector(
+  const { leadArticle, leadArticles = [], breakingNews, trending, articles, loading } = useAppSelector(
     (state) => state.articles
   );
   const { categories } = useAppSelector((state) => state.categories);
@@ -30,6 +33,77 @@ export default function HomePage() {
     dispatch(fetchHomepageHighlights());
     dispatch(fetchPublicArticles({ limit: 50 }));
   }, [dispatch]);
+
+  // Aggregate ALL articles marked as "Feature as Lead Story" for 15s Carousel
+  const allLeadStories = useMemo(() => {
+    const list: Article[] = [];
+    const seenIds = new Set<string>();
+
+    const addArticle = (a?: Article | null) => {
+      if (!a || !a._id || seenIds.has(a._id)) return;
+      seenIds.add(a._id);
+      list.push(a);
+    };
+
+    // 1. Stored Lead Story IDs from localStorage (Admin toggles)
+    const storedIds = typeof window !== 'undefined' ? getStoredLeadStoryIds() : [];
+    if (storedIds.length > 0 && Array.isArray(articles)) {
+      storedIds.forEach((id) => {
+        const found = articles.find((a) => a._id === id);
+        if (found) addArticle(found);
+      });
+    }
+
+    // 2. leadArticles from highlights API
+    if (Array.isArray(leadArticles)) {
+      leadArticles.forEach(addArticle);
+    }
+
+    // 3. Any articles in public feed with isLead === true
+    if (Array.isArray(articles)) {
+      articles.forEach((a) => {
+        if (a && a.isLead) addArticle(a);
+      });
+    }
+
+    // 4. Fallback single leadArticle
+    if (leadArticle && leadArticle._id) {
+      addArticle(leadArticle);
+    }
+
+    // 5. CRITICAL: Pad with top published articles so the 15-second slider with arrows & dots is ALWAYS active!
+    if (list.length < 3 && Array.isArray(articles) && articles.length > 0) {
+      // Prioritize published stories with images
+      const withImages = articles.filter(
+        (a) => a && a.status === 'published' && a._id && !seenIds.has(a._id) && a.featuredImage?.url
+      );
+      for (const cand of withImages) {
+        if (list.length >= 4) break;
+        addArticle(cand);
+      }
+      // If still fewer than 3, add any published stories
+      if (list.length < 3) {
+        for (const a of articles) {
+          if (list.length >= 4) break;
+          addArticle(a);
+        }
+      }
+    }
+
+    // 6. Also check trending if still fewer than 3
+    if (list.length < 3 && Array.isArray(trending) && trending.length > 0) {
+      for (const t of trending) {
+        if (list.length >= 4) break;
+        addArticle(t);
+      }
+    }
+
+    return list;
+  }, [leadArticles, articles, leadArticle, trending]);
+
+  const leadIds = useMemo(() => {
+    return new Set(allLeadStories.map((a) => a._id));
+  }, [allLeadStories]);
 
   // Group articles by category slug or name dynamically
   const articlesByCategory = useMemo(() => {
@@ -60,12 +134,12 @@ export default function HomePage() {
     return map;
   }, [articles, categories]);
 
-  // Recent dispatches for the primary wire feed (excluding lead article)
+  // Recent dispatches for the primary wire feed (excluding all lead carousel stories)
   const recentDispatches = useMemo(() => {
     return articles
-      .filter((a) => a._id !== leadArticle?._id)
+      .filter((a) => !leadIds.has(a._id))
       .slice(0, 6);
-  }, [articles, leadArticle]);
+  }, [articles, leadIds]);
 
   // Filter categories that have published articles
   const activeSectors = useMemo(() => {
@@ -106,80 +180,12 @@ export default function HomePage() {
       <main id="main" className="flex-1">
         <h1 className="sr-only">Navigating Marine Excellence: independent maritime news and analysis</h1>
 
-        {/* Lead Hero Section */}
+        {/* Lead Hero Section: 15-second Auto-Sliding Carousel */}
         <section className="mx-auto max-w-6xl px-5 pt-10">
-          {leadArticle ? (
-            <article className="grid gap-6 md:grid-cols-[1.35fr_1fr] md:gap-10 border-b border-rule pb-10">
-              {/* Media image */}
-              <Link
-                href={`/articles/${leadArticle.slug}`}
-                className="order-first md:order-last block overflow-hidden rounded-md bg-wash group"
-              >
-                {leadArticle.featuredImage?.url ? (
-                  <div className="relative aspect-[16/10] w-full overflow-hidden">
-                    <img
-                      src={leadArticle.featuredImage.url}
-                      alt={leadArticle.featuredImage.alt || leadArticle.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  </div>
-                ) : (
-                  <div className="aspect-[16/10] w-full bg-navy-50 flex items-center justify-center text-navy-700">
-                    <Newspaper className="h-16 w-16 opacity-30" />
-                  </div>
-                )}
-                {leadArticle.featuredImage?.caption && (
-                  <p className="mt-1.5 text-[11px] text-muted italic">
-                    {leadArticle.featuredImage.caption}
-                  </p>
-                )}
-              </Link>
+          <LeadStoryCarousel articles={allLeadStories} />
 
-              {/* Story textual details */}
-              <div className="flex flex-col justify-between">
-                <div>
-                  <div className="mb-2">
-                    <Link
-                      href={`/category/${typeof leadArticle.category === 'object' && leadArticle.category ? leadArticle.category.slug : 'shipping'}`}
-                      className="text-xs font-semibold uppercase tracking-wider text-navy-700 hover:underline"
-                    >
-                      {leadArticle.categoryName || 'Shipping'}
-                    </Link>
-                  </div>
-                  <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight text-navy-900">
-                    <Link href={`/articles/${leadArticle.slug}`} className="hover:underline">
-                      {leadArticle.title}
-                    </Link>
-                  </h2>
-                  {leadArticle.subtitle && (
-                    <p className="mt-3 text-sm sm:text-base text-muted leading-relaxed">
-                      {leadArticle.subtitle}
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-6 flex items-center gap-3 text-xs text-muted">
-                  <span className="font-medium text-navy-900">
-                    {(leadArticle.author as any)?.name || leadArticle.authorName || 'Staff'}
-                  </span>
-                  <span>•</span>
-                  <span>
-                    {leadArticle.publishedAt
-                      ? new Date(leadArticle.publishedAt).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                      : 'Recently'}
-                  </span>
-                  <span>•</span>
-                  <span>{leadArticle.readTime}</span>
-                </div>
-              </div>
-            </article>
-          ) : (
-            <div className="py-12 text-center text-muted">Loading today&apos;s maritime lead...</div>
-          )}
+          {/* Sponsored Leaderboard Announcement */}
+          <AdBanner placement="homepage_top" />
         </section>
 
         {/* Recent Dispatches Section & Trending Sidebar */}
@@ -231,12 +237,34 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    <div className="mt-4 flex items-center gap-2 text-[11px] text-muted">
-                      <span className="font-medium text-navy-900">
-                        {(art.author as any)?.name || art.authorName || 'Staff'}
-                      </span>
-                      <span>•</span>
-                      <span>{art.readTime}</span>
+                    <div className="mt-4 flex items-center justify-between text-[11px] text-muted border-t border-rule/50 pt-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-navy-900">
+                          {(art.author as any)?.name || art.authorName || 'Staff'}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {art.readTime
+                            ? art.readTime.includes('min')
+                              ? art.readTime
+                              : `${art.readTime} min`
+                            : '3 min'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2.5 font-semibold text-[11px]">
+                        <span className="inline-flex items-center gap-1 text-amber-700" title={`${art.views || 0} views`}>
+                          <Flame className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                          <span>{art.views || 0}</span>
+                        </span>
+                        <Link
+                          href={`/articles/${art.slug}#comments`}
+                          className="inline-flex items-center gap-1 text-navy-800 hover:text-navy-950 transition-colors"
+                          title={`${art.commentCount || 0} comments`}
+                        >
+                          <MessageSquare className="h-3 w-3 text-navy-600" />
+                          <span>{art.commentCount || 0}</span>
+                        </Link>
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -267,7 +295,10 @@ export default function HomePage() {
                         <div className="flex items-center gap-2 mt-1 text-[11px] text-muted">
                           <span>{trend.categoryName || 'Shipping'}</span>
                           <span>•</span>
-                          <span>{trend.views} reads</span>
+                          <span className="inline-flex items-center gap-1 font-semibold text-amber-700">
+                            <Flame className="h-3 w-3 text-amber-500 fill-amber-500" />
+                            <span>{trend.views || 0}</span>
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -288,8 +319,16 @@ export default function HomePage() {
                   Configure Topics & Frequency
                 </Link>
               </div>
+
+              {/* Sidebar Sponsor Card */}
+              <AdBanner placement="article_sidebar" />
             </aside>
           </div>
+        </section>
+
+        {/* Mid-Page Sponsor Feature Spotlight */}
+        <section className="mx-auto max-w-6xl px-5">
+          <AdBanner placement="homepage_mid" />
         </section>
 
         {/* Dedicated Editorial Sector Sections (Dynamic by Category, matching Image 2 & website-01-homepage.html) */}
@@ -363,12 +402,26 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    <div className="mt-4 flex items-center gap-2 text-[11px] text-muted">
-                      <span className="font-medium text-navy-900">
-                        {(art.author as any)?.name || art.authorName || 'Staff'}
-                      </span>
-                      <span>•</span>
-                      <span>{art.readTime || '3 min read'}</span>
+                    <div className="mt-4 flex items-center justify-between text-[11px] text-muted border-t border-rule/40 pt-2">
+                      <div className="flex items-center gap-1.5 truncate max-w-[130px]">
+                        <span className="font-medium text-navy-900 truncate">
+                          {(art.author as any)?.name || art.authorName || 'Staff'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 font-semibold text-[11px] shrink-0">
+                        <span className="inline-flex items-center gap-1 text-amber-700" title={`${art.views || 0} views`}>
+                          <Flame className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                          <span>{art.views || 0}</span>
+                        </span>
+                        <Link
+                          href={`/articles/${art.slug}#comments`}
+                          className="inline-flex items-center gap-1 text-navy-800 hover:text-navy-950 transition-colors"
+                          title={`${art.commentCount || 0} comments`}
+                        >
+                          <MessageSquare className="h-3 w-3 text-navy-600" />
+                          <span>{art.commentCount || 0}</span>
+                        </Link>
+                      </div>
                     </div>
                   </article>
                 ))}

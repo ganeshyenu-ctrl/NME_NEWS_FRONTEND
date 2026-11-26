@@ -5,6 +5,7 @@ import { Article } from '@/types';
 interface ArticlesState {
   articles: Article[];
   leadArticle: Article | null;
+  leadArticles: Article[];
   breakingNews: { title: string; slug: string }[];
   trending: Article[];
   currentArticle: Article | null;
@@ -19,6 +20,7 @@ interface ArticlesState {
 const initialState: ArticlesState = {
   articles: [],
   leadArticle: null,
+  leadArticles: [],
   breakingNews: [],
   trending: [],
   currentArticle: null,
@@ -85,7 +87,9 @@ const articlesSlice = createSlice({
     // Highlights
     builder
       .addCase(fetchHomepageHighlights.fulfilled, (state, action) => {
-        state.leadArticle = action.payload.lead;
+        state.leadArticle = action.payload.leadArticle || action.payload.lead || null;
+        state.leadArticles =
+          action.payload.leadArticles || (state.leadArticle ? [state.leadArticle] : []);
         state.breakingNews = action.payload.breakingNews || [];
         state.trending = action.payload.trending || [];
       })

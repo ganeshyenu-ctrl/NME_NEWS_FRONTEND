@@ -7,6 +7,11 @@ import { Category, Article, MediaItem } from '@/types';
 import { useAppSelector } from '@/store/hooks';
 import CustomSelect from '@/components/ui/CustomSelect';
 import {
+  addStoredLeadStoryId,
+  removeStoredLeadStoryId,
+  isStoredLeadStory,
+} from '@/lib/leadStoryStorage';
+import {
   Save,
   Send,
   Eye,
@@ -43,7 +48,9 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
   const [status, setStatus] = useState<'draft' | 'published' | 'scheduled'>(
     initialArticle?.status || 'draft'
   );
-  const [isLead, setIsLead] = useState(initialArticle?.isLead || false);
+  const [isLead, setIsLead] = useState(
+    Boolean(initialArticle?.isLead || (initialArticle?._id && isStoredLeadStory(initialArticle._id)))
+  );
   const [isBreaking, setIsBreaking] = useState(initialArticle?.isBreaking || false);
   const [imageUrl, setImageUrl] = useState(initialArticle?.featuredImage?.url || '');
   const [imageCaption, setImageCaption] = useState(initialArticle?.featuredImage?.caption || '');
@@ -162,9 +169,18 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
 
       if (isEditMode && initialArticle?._id) {
         await api.put(`/articles/admin/${initialArticle._id}`, payload);
+        if (isLead) {
+          addStoredLeadStoryId(initialArticle._id);
+        } else {
+          removeStoredLeadStoryId(initialArticle._id);
+        }
         setFeedback({ type: 'success', message: 'Article updated successfully!' });
       } else {
         const res = await api.post('/articles/admin', payload);
+        const createdId = res.data?.article?._id;
+        if (createdId && isLead) {
+          addStoredLeadStoryId(createdId);
+        }
         setFeedback({ type: 'success', message: 'Article created successfully!' });
         setTimeout(() => {
           router.push(`/admin/articles/${res.data.article._id}/edit`);
@@ -351,15 +367,20 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
 
           {/* Toggles */}
           <div className="space-y-3 pt-2 border-t border-rule text-xs">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={isLead}
-                onChange={(e) => setIsLead(e.target.checked)}
-                className="h-4 w-4 rounded border-rule text-navy-900 focus:ring-navy-700"
-              />
-              <span className="font-semibold text-navy-900">Feature as Lead Story</span>
-            </label>
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isLead}
+                  onChange={(e) => setIsLead(e.target.checked)}
+                  className="h-4 w-4 rounded border-rule text-navy-900 focus:ring-navy-700"
+                />
+                <span className="font-semibold text-navy-900">Feature as Lead Story</span>
+              </label>
+              <p className="text-[11px] text-muted pl-6 mt-0.5">
+                Rotates in the public homepage 15-second lead carousel. You can select multiple lead stories.
+              </p>
+            </div>
 
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input

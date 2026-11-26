@@ -20,7 +20,13 @@ import {
   Filter,
   RotateCcw,
   X,
+  Flame,
+  CheckCircle2,
 } from 'lucide-react';
+import {
+  isStoredLeadStory,
+  toggleStoredLeadStoryId,
+} from '@/lib/leadStoryStorage';
 
 type SortField = 'title' | 'category' | 'author' | 'status' | 'date';
 type SortDirection = 'asc' | 'desc';
@@ -33,6 +39,10 @@ export default function AdminArticlesPage() {
   const [usersMap, setUsersMap] = useState<Record<string, { role: string; name: string }>>({});
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+
+  // Lead Story Toggling & Notice State
+  const [togglingLeadId, setTogglingLeadId] = useState<string | null>(null);
+  const [leadNotice, setLeadNotice] = useState<string | null>(null);
 
   // Filters State
   const [statusFilter, setStatusFilter] = useState('all');
@@ -71,7 +81,7 @@ export default function AdminArticlesPage() {
     try {
       const res = await api.get('/articles/admin/list', {
         params: {
-          status: statusFilter !== 'all' ? statusFilter : undefined,
+          status: statusFilter !== 'all' && statusFilter !== 'lead' ? statusFilter : undefined,
           category: categoryFilter !== 'all' ? categoryFilter : undefined,
           author: authorFilter !== 'all' ? authorFilter : undefined,
           search: search.trim() || undefined,
@@ -174,9 +184,53 @@ export default function AdminArticlesPage() {
     return list.sort((a, b) => a.name.localeCompare(b.name));
   }, [usersMap, articles]);
 
+  // 1-Click Toggle for Lead Story Feature (Homepage 15s Hero Slider)
+  const handleToggleLeadStory = async (art: Article) => {
+    if (!art._id || togglingLeadId) return;
+    setTogglingLeadId(art._id);
+    const currentlyLead = Boolean(art._id && isStoredLeadStory(art._id, art.isLead));
+    const nextLeadState = !currentlyLead;
+
+    try {
+      toggleStoredLeadStoryId(art._id);
+
+      // Optimistically update local state immediately
+      setArticles((prev) =>
+        prev.map((a) => (a._id === art._id ? { ...a, isLead: nextLeadState } : a))
+      );
+
+      await api.put(`/articles/admin/${art._id}`, {
+        isLead: nextLeadState,
+      });
+
+      setLeadNotice(
+        nextLeadState
+          ? `"${art.title}" is now featured in the 15-second Homepage Hero Slider!`
+          : `"${art.title}" was removed from the Lead Story Slider.`
+      );
+      setTimeout(() => setLeadNotice(null), 4000);
+    } catch (err: any) {
+      // Revert if error
+      toggleStoredLeadStoryId(art._id);
+      setArticles((prev) =>
+        prev.map((a) => (a._id === art._id ? { ...a, isLead: currentlyLead } : a))
+      );
+      setLeadNotice(err.response?.data?.message || 'Failed to update Lead Story status.');
+      setTimeout(() => setLeadNotice(null), 4000);
+    } finally {
+      setTogglingLeadId(null);
+    }
+  };
+
   // Client-sorted articles for guaranteed immediate visual sorting response
   const sortedArticles = useMemo(() => {
-    const copy = [...articles];
+    let copy = [...articles];
+
+    // Filter to lead stories if the lead tab is active
+    if (statusFilter === 'lead') {
+      copy = copy.filter((a) => Boolean(a._id && isStoredLeadStory(a._id, a.isLead)));
+    }
+
     return copy.sort((a, b) => {
       let valA: any = '';
       let valB: any = '';
@@ -239,6 +293,14 @@ export default function AdminArticlesPage() {
       />
 
       <main className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-6">
+        {/* Lead Story Update Feedback Notice */}
+        {leadNotice && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-900 shadow-xs">
+            <CheckCircle2 className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>{leadNotice}</span>
+          </div>
+        )}
+
         {/* ========================================================================= */}
         {/* COMPREHENSIVE FILTER CONTROLS BAR                                         */}
         {/* ========================================================================= */}
@@ -252,6 +314,7 @@ export default function AdminArticlesPage() {
                 { id: 'published', label: 'Published' },
                 { id: 'draft', label: 'Draft' },
                 { id: 'scheduled', label: 'Scheduled' },
+                { id: 'lead', label: '★ Lead Stories' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -466,15 +529,55 @@ export default function AdminArticlesPage() {
                     return (
                       <tr key={art._id} className="hover:bg-wash/50 transition-colors">
                         <td className="px-5 py-3 max-w-sm">
-                          <Link
-                            href={`/admin/articles/${art._id}/edit`}
-                            className="font-medium text-navy-900 hover:underline block line-clamp-2"
-                          >
-                            {art.title}
-                          </Link>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Link
+                              href={`/admin/articles/${art._id}/edit`}
+                              className="font-medium text-navy-900 hover:underline line-clamp-2"
+                            >
+                              {art.title}
+                            </Link>
+
+                            {/* 1-Click Interactive Feature as Lead Story Button */}
+                            {art.status === 'published' && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleLeadStory(art)}
+                                disabled={togglingLeadId === art._id}
+                                title={
+                                  Boolean(art._id && isStoredLeadStory(art._id, art.isLead))
+                                    ? 'Click to remove from 15-second Homepage Lead Slider'
+                                    : 'Click to feature in 15-second Homepage Lead Slider'
+                                }
+                                className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 transition-all cursor-pointer ${
+                                  Boolean(art._id && isStoredLeadStory(art._id, art.isLead))
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-xs hover:bg-amber-200'
+                                    : 'bg-wash text-muted border border-rule hover:bg-amber-50 hover:text-amber-900 hover:border-amber-300'
+                                }`}
+                              >
+                                <Flame
+                                  className={`h-3 w-3 ${
+                                    Boolean(art._id && isStoredLeadStory(art._id, art.isLead))
+                                      ? 'text-amber-600 fill-amber-500'
+                                      : 'text-gray-400'
+                                  }`}
+                                />
+                                <span>
+                                  {Boolean(art._id && isStoredLeadStory(art._id, art.isLead))
+                                    ? 'Lead Story ★'
+                                    : '+ Lead Story'}
+                                </span>
+                              </button>
+                            )}
+                          </div>
                           {art.subtitle && (
                             <p className="text-[11px] text-muted truncate mt-0.5">{art.subtitle}</p>
                           )}
+                          <div className="flex items-center gap-1.5 mt-1 text-[11px]">
+                            <span className="inline-flex items-center gap-1 font-semibold text-amber-700" title={`${art.views || 0} views`}>
+                              <Flame className="h-3 w-3 text-amber-500 fill-amber-500" />
+                              <span>{art.views || 0}</span>
+                            </span>
+                          </div>
                         </td>
                         <td className="px-5 py-3 whitespace-nowrap">
                           <span className="rounded bg-navy-50 border border-navy-100 px-2 py-0.5 text-[11px] font-medium text-navy-700">

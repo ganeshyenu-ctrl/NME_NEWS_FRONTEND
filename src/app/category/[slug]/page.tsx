@@ -7,7 +7,7 @@ import Header from '@/components/website/Header';
 import Footer from '@/components/website/Footer';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchPublicArticles } from '@/store/slices/articlesSlice';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Flame, MessageSquare } from 'lucide-react';
 
 export default function CategoryDetailPage() {
   const params = useParams();
@@ -91,8 +91,32 @@ export default function CategoryDetailPage() {
                   </div>
 
                   <div className="border-t border-rule/60 p-5 pt-3 flex items-center justify-between text-[11px] text-muted">
-                    <span>{(art.author as any)?.name || art.authorName || 'Staff'}</span>
-                    <span>{art.readTime}</span>
+                    <span className="font-medium text-navy-900 truncate max-w-[120px]">
+                      {(art.author as any)?.name || art.authorName || 'Staff'}
+                    </span>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <span className="inline-flex items-center gap-1 font-semibold text-amber-700" title={`${art.views || 0} views`}>
+                        <Flame className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                        <span>{art.views || 0}</span>
+                      </span>
+                      <span>•</span>
+                      <Link
+                        href={`/articles/${art.slug}#comments`}
+                        className="inline-flex items-center gap-1 font-semibold text-navy-800 hover:text-navy-950 transition-colors"
+                        title={`${art.commentCount || 0} comments`}
+                      >
+                        <MessageSquare className="h-3 w-3 text-navy-600" />
+                        <span>{art.commentCount || 0}</span>
+                      </Link>
+                      <span>•</span>
+                      <span>
+                        {art.readTime
+                          ? art.readTime.includes('min')
+                            ? art.readTime
+                            : `${art.readTime} min`
+                          : '3 min'}
+                      </span>
+                    </div>
                   </div>
                 </article>
               ))}

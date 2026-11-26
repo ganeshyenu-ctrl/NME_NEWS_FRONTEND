@@ -21,6 +21,14 @@ import {
   ChevronLeft,
   ChevronRight,
   UserCheck,
+  Calendar,
+  Tag,
+  Mail,
+  UserPlus,
+  Send,
+  BarChart3,
+  MessageSquare,
+  Megaphone,
 } from 'lucide-react';
 
 export default function AdminSidebar() {
@@ -38,12 +46,21 @@ export default function AdminSidebar() {
   const navItems = [
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { label: 'Articles', href: '/admin/articles', icon: FileText },
+    { label: 'Editorial Calendar', href: '/admin/calendar', icon: Calendar },
     { label: 'Create Article', href: '/admin/articles/create', icon: SquarePen },
     { label: 'Media Library', href: '/admin/media', icon: ImageIcon },
-    { label: 'My Profile', href: '/admin/profile', icon: UserCheck },
     ...(user?.role === 'admin' || user?.role === 'editor'
-      ? [{ label: 'Categories', href: '/admin/categories', icon: FolderTree }]
+      ? [
+          { label: 'Comments', href: '/admin/comments', icon: MessageSquare },
+          { label: 'Categories', href: '/admin/categories', icon: FolderTree },
+          { label: 'Tags', href: '/admin/tags', icon: Tag },
+          { label: 'Newsletter', href: '/admin/newsletter', icon: Mail },
+          { label: 'Subscribers', href: '/admin/subscribers', icon: UserPlus },
+          { label: 'Ad Campaigns', href: '/admin/campaigns', icon: Megaphone },
+          { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+        ]
       : []),
+    { label: 'My Profile', href: '/admin/profile', icon: UserCheck },
     ...(user?.role === 'admin'
       ? [
           { label: 'Users & Roles', href: '/admin/users', icon: Users },

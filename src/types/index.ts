@@ -25,6 +25,7 @@ export interface Category {
 
 export interface Article {
   _id: string;
+  id?: string;
   title: string;
   slug: string;
   subtitle?: string;
@@ -43,6 +44,8 @@ export interface Article {
   };
   readTime: string;
   views: number;
+  commentCount?: number;
+  commentsCount?: number;
   publishedAt?: string;
   scheduledAt?: string;
   tags: string[];
@@ -113,3 +116,143 @@ export interface DashboardStats {
   todayVisitors?: number;
   liveVisitors?: number;
 }
+
+export interface TagItem {
+  _id: string;
+  id?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  articleCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SubscriberItem {
+  _id: string;
+  id?: string;
+  email: string;
+  firstName?: string;
+  status: 'SUBSCRIBED' | 'UNSUBSCRIBED' | 'SUPPRESSED' | 'active' | 'unsubscribed';
+  source: string;
+  topics?: string[];
+  frequency?: string;
+  consentAt: string;
+  subscribedAt: string;
+  unsubscribedAt?: string | null;
+  suppressReason?: string;
+  createdAt?: string;
+}
+
+export interface NewsletterStats {
+  total: number;
+  subscribed: number;
+  unsubscribed: number;
+  suppressed: number;
+  sources: Record<string, number>;
+  growth: Array<{ label: string; count: number; year?: number; month?: number }>;
+  suppressedList: Array<{ _id: string; id?: string; email: string; suppressReason?: string; unsubscribedAt?: string }>;
+  recentCampaigns: CampaignItem[];
+}
+
+export interface CampaignItem {
+  _id: string;
+  id?: string;
+  subject: string;
+  preview?: string;
+  intro?: string;
+  articleIds: any[];
+  status: 'DRAFT' | 'SCHEDULED' | 'SENT';
+  scheduledAt?: string | null;
+  sentAt?: string | null;
+  report?: {
+    recipients: number;
+    excluded: number;
+    simulated?: boolean;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CalendarArticleItem {
+  _id: string;
+  id: string;
+  title: string;
+  headline: string;
+  slug: string;
+  status: string;
+  scheduledAt?: string | null;
+  publishedAt?: string | null;
+  at?: string | null;
+  category?: any;
+  author?: any;
+  categoryId?: string;
+  authorId?: string;
+  categoryName?: string;
+  authorName?: string;
+}
+
+export interface AnalyticsOverview {
+  publishedCount: number;
+  totalArticles: number;
+  totalViews: number;
+  activeSubscribers: number;
+  mostRead: Array<{
+    id: string;
+    _id?: string;
+    headline: string;
+    slug: string;
+    views: number;
+    publishedAt?: string;
+    categoryName?: string;
+  }>;
+  viewsByCategory: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    articleCount: number;
+    views: number;
+  }>;
+  articlesByAuthor: Array<{
+    id: string;
+    name: string;
+    role?: string;
+    count: number;
+  }>;
+  statusCounts: {
+    DRAFT: number;
+    UNDER_REVIEW: number;
+    APPROVED: number;
+    SCHEDULED: number;
+    PUBLISHED: number;
+    [key: string]: number;
+  };
+  dailyTraffic: Array<{
+    date: string;
+    pageViews: number;
+    uniqueVisitors: number;
+  }>;
+}
+
+export interface AdCampaignItem {
+  _id: string;
+  id?: string;
+  title: string;
+  advertiser: string;
+  placement: 'homepage_top' | 'homepage_mid' | 'article_sidebar' | 'article_inline' | 'all';
+  imageUrl: string;
+  targetUrl: string;
+  callToAction: string;
+  headline?: string;
+  description?: string;
+  badgeText: 'AD' | 'SPONSORED' | 'ADVERTISEMENT' | 'PARTNER CONTENT';
+  status: 'ACTIVE' | 'PAUSED' | 'DRAFT' | 'EXPIRED';
+  startDate?: string;
+  endDate?: string;
+  impressions: number;
+  clicks: number;
+  ctr?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
