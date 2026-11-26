@@ -121,6 +121,7 @@ export default function NewsletterPage() {
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder="e.g. Captain Siddharth"
                     className="w-full rounded-md border border-rule bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/60 focus:border-navy-700 focus:outline-none"
+                    suppressHydrationWarning
                   />
                 </div>
                 <div>
@@ -132,6 +133,7 @@ export default function NewsletterPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="executive@maritime-group.com"
                     className="w-full rounded-md border border-rule bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/60 focus:border-navy-700 focus:outline-none"
+                    suppressHydrationWarning
                   />
                 </div>
               </div>
@@ -216,6 +218,7 @@ export default function NewsletterPage() {
                     checked={consent}
                     onChange={(e) => setConsent(e.target.checked)}
                     className="mt-0.5 rounded border-rule text-navy-900 focus:ring-0 cursor-pointer"
+                    suppressHydrationWarning
                   />
                   <span className="text-xs text-ink leading-relaxed">
                     I agree to receive the NME newsletter and strategic intelligence dispatches by email. Consent is recorded and I can unsubscribe anytime in one click.
@@ -228,6 +231,7 @@ export default function NewsletterPage() {
                 type="submit"
                 disabled={submitting || !consent}
                 className="w-full rounded-md bg-navy-900 py-3 text-sm font-semibold text-white hover:bg-navy-800 disabled:opacity-50 transition-colors cursor-pointer shadow-sm"
+                suppressHydrationWarning
               >
                 {submitting ? 'Setting up subscription...' : 'Complete Subscription'}
               </button>

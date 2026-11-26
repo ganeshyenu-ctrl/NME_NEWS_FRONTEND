@@ -21,6 +21,9 @@ export default function HomePage() {
   );
   const { categories } = useAppSelector((state) => state.categories);
 
+  const [mounted, setMounted] = useState(false);
+  const [localLeadStoryIds, setLocalLeadStoryIds] = useState<string[]>([]);
+
   // Homepage Newsletter Subscription State
   const [nlEmail, setNlEmail] = useState('');
   const [nlName, setNlName] = useState('');
@@ -29,6 +32,8 @@ export default function HomePage() {
   const [nlMessage, setNlMessage] = useState('');
 
   useEffect(() => {
+    setMounted(true);
+    setLocalLeadStoryIds(getStoredLeadStoryIds());
     dispatch(fetchCategories());
     dispatch(fetchHomepageHighlights());
     dispatch(fetchPublicArticles({ limit: 50 }));
@@ -46,7 +51,7 @@ export default function HomePage() {
     };
 
     // 1. Stored Lead Story IDs from localStorage (Admin toggles)
-    const storedIds = typeof window !== 'undefined' ? getStoredLeadStoryIds() : [];
+    const storedIds = mounted ? localLeadStoryIds : [];
     if (storedIds.length > 0 && Array.isArray(articles)) {
       storedIds.forEach((id) => {
         const found = articles.find((a) => a._id === id);
@@ -440,7 +445,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <form onSubmit={handleHomeNewsletter} className="grid gap-3">
+            <form onSubmit={handleHomeNewsletter} className="grid gap-3" suppressHydrationWarning>
               <div className="grid gap-3 sm:grid-cols-[1fr_1.4fr_auto]">
                 <input
                   type="text"
@@ -448,6 +453,7 @@ export default function HomePage() {
                   value={nlName}
                   onChange={(e) => setNlName(e.target.value)}
                   className="border px-3 py-2.5 text-sm focus:outline-none border-white/30 bg-white/5 text-white placeholder:text-navy-100/70 focus:border-white rounded"
+                  suppressHydrationWarning
                 />
                 <input
                   type="email"
@@ -456,11 +462,13 @@ export default function HomePage() {
                   value={nlEmail}
                   onChange={(e) => setNlEmail(e.target.value)}
                   className="border px-3 py-2.5 text-sm focus:outline-none border-white/30 bg-white/5 text-white placeholder:text-navy-100/70 focus:border-white rounded"
+                  suppressHydrationWarning
                 />
                 <button
                   type="submit"
                   disabled={nlStatus === 'loading'}
                   className="px-5 py-2.5 text-sm font-semibold bg-white text-navy-900 hover:bg-navy-50 rounded transition-colors disabled:opacity-60"
+                  suppressHydrationWarning
                 >
                   {nlStatus === 'loading' ? 'Subscribing...' : 'Subscribe'}
                 </button>
@@ -487,6 +495,7 @@ export default function HomePage() {
                   checked={nlConsent}
                   onChange={(e) => setNlConsent(e.target.checked)}
                   className="mt-0.5"
+                  suppressHydrationWarning
                 />
                 <span>
                   I agree to receive the NME newsletter by email. See our{' '}

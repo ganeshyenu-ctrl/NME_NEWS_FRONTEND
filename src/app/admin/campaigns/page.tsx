@@ -5,13 +5,6 @@ import { api } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { AdCampaignItem } from '@/types';
 import {
-  getLocalAds,
-  upsertLocalAd,
-  toggleLocalAdStatus,
-  deleteLocalAd,
-  getLocalAdStats,
-} from '@/lib/adStorage';
-import {
   Megaphone,
   Plus,
   Trash2,
@@ -63,6 +56,7 @@ export default function CampaignsListPage() {
     status: 'ACTIVE' as AdCampaignItem['status'],
   });
   const [modalSubmitting, setModalSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Feedback toast
   const [feedback, setFeedback] = useState<{ type: 'success' | 'err'; message: string } | null>(null);
@@ -72,68 +66,67 @@ export default function CampaignsListPage() {
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  // --- Fetch Advertisements ---
+  const computeStats = (list: AdCampaignItem[]) => {
+    const total = list.length;
+    const active = list.filter((a) => a.status === 'ACTIVE').length;
+    const paused = list.filter((a) => a.status === 'PAUSED').length;
+    const totalImpressions = list.reduce((acc, a) => acc + (a.impressions || 0), 0);
+    const totalClicks = list.reduce((acc, a) => acc + (a.clicks || 0), 0);
+    const overallCtr =
+      totalImpressions > 0 ? Number(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0;
+    return { total, active, paused, totalImpressions, totalClicks, overallCtr };
+  };
+
+  // --- Fetch Advertisements (Live Database Only) ---
   const fetchAds = useCallback(async (isSilent = false) => {
     try {
       if (!isSilent) setAdsLoading(true);
-      const res = await api.get('/ads/admin').catch((err) => {
-        if (err.response?.status === 404 || !err.response) {
-          return { data: { success: true, ads: getLocalAds(), stats: getLocalAdStats() } };
-        }
-        throw err;
-      });
+      const res = await api.get('/ads/admin');
 
       if (res.data?.success && Array.isArray(res.data.ads)) {
-        setAds(res.data.ads);
-        if (res.data.stats) {
-          setAdsStats(res.data.stats);
-        }
+        const liveAds: AdCampaignItem[] = res.data.ads;
+        setAds(liveAds);
+        setAdsStats(res.data.stats || computeStats(liveAds));
       } else {
-        setAds(getLocalAds());
-        setAdsStats(getLocalAdStats());
+        setAds([]);
+        setAdsStats(computeStats([]));
       }
     } catch (err: any) {
-      setAds(getLocalAds());
-      setAdsStats(getLocalAdStats());
+      if (!isSilent) {
+        const msg = err?.response?.data?.message || 'Failed to load advertisement campaigns from server';
+        setFeedback({ type: 'err', message: msg });
+        setTimeout(() => setFeedback(null), 4000);
+      }
     } finally {
       if (!isSilent) setAdsLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // Clear any legacy local sample-ad cache keys so only live database data is used
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('nme_advertisement_campaigns_cache');
+        localStorage.removeItem('nme_deleted_ad_ids');
+      } catch {}
+    }
+
     fetchAds(false);
 
-    // 1. WebSocket listener for live backend ad impression & click broadcasts
+    // WebSocket listener for live backend ad changes & impression/click broadcasts
     const socket = getSocket();
     const handleSocketUpdate = () => {
       fetchAds(true);
     };
     socket.on('ad_metrics_updated', handleSocketUpdate);
 
-    // 2. Storage event listener for cross-tab realtime updates
-    const handleStorageUpdate = (e: StorageEvent) => {
-      if (e.key === 'nme_advertisement_campaigns_cache') {
-        fetchAds(true);
-      }
-    };
-
-    // 3. Custom event listener for same-tab instant realtime updates
-    const handleCustomUpdate = () => {
-      fetchAds(true);
-    };
-
-    window.addEventListener('storage', handleStorageUpdate);
-    window.addEventListener('nme_ad_metrics_updated', handleCustomUpdate);
-
-    // 4. Guaranteed 3-second live auto-refresh
+    // Live auto-refresh fallback
     const interval = setInterval(() => {
       fetchAds(true);
-    }, 3000);
+    }, 5000);
 
     return () => {
       socket.off('ad_metrics_updated', handleSocketUpdate);
-      window.removeEventListener('storage', handleStorageUpdate);
-      window.removeEventListener('nme_ad_metrics_updated', handleCustomUpdate);
       clearInterval(interval);
     };
   }, [fetchAds]);
@@ -183,45 +176,26 @@ export default function CampaignsListPage() {
     setModalSubmitting(true);
     try {
       if (editingAd) {
-        // Update
-        const res = await api
-          .put(`/ads/admin/${editingAd._id}`, adForm)
-          .catch((err) => {
-            if (err.response?.status === 404 || !err.response) {
-              const updated = upsertLocalAd({ ...adForm, _id: editingAd._id });
-              return { data: { success: true, ad: updated } };
-            }
-            throw err;
-          });
-
+        const res = await api.put(`/ads/admin/${editingAd._id}`, adForm);
         if (res.data?.success) {
-          upsertLocalAd({ ...adForm, _id: editingAd._id });
           showToast('Advertisement campaign updated successfully', 'success');
           setIsAdModalOpen(false);
-          fetchAds();
+          await fetchAds(true);
         }
       } else {
-        // Create
-        const res = await api.post('/ads/admin', adForm).catch((err) => {
-          if (err.response?.status === 404 || !err.response) {
-            const created = upsertLocalAd(adForm);
-            return { data: { success: true, ad: created } };
-          }
-          throw err;
-        });
-
+        const res = await api.post('/ads/admin', adForm);
         if (res.data?.success) {
-          upsertLocalAd(adForm);
           showToast('New advertisement campaign launched', 'success');
           setIsAdModalOpen(false);
-          fetchAds();
+          await fetchAds(true);
         }
       }
     } catch (err: any) {
-      upsertLocalAd(adForm);
-      showToast('Advertisement campaign saved', 'success');
-      setIsAdModalOpen(false);
-      fetchAds();
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.errors?.[0] ||
+        'Failed to save advertisement campaign';
+      showToast(msg, 'err');
     } finally {
       setModalSubmitting(false);
     }
@@ -229,54 +203,45 @@ export default function CampaignsListPage() {
 
   const handleToggleAdStatus = async (id: string) => {
     try {
-      const res = await api.patch(`/ads/admin/${id}/status`).catch((err) => {
-        if (err.response?.status === 404 || !err.response) {
-          const toggled = toggleLocalAdStatus(id);
-          return { data: { success: true, ad: toggled } };
-        }
-        throw err;
-      });
-
+      const res = await api.patch(`/ads/admin/${id}/status`);
       if (res.data?.success) {
-        toggleLocalAdStatus(id);
-        setAds((prev) =>
-          prev.map((a) =>
-            a._id === id ? { ...a, status: a.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' } : a
-          )
-        );
-        showToast('Status updated', 'success');
-        fetchAds();
+        setAds((prev) => {
+          const next = prev.map((a) =>
+            a._id === id ? { ...a, status: res.data.ad?.status || (a.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE') } : a
+          );
+          setAdsStats(computeStats(next));
+          return next;
+        });
+        showToast(res.data?.message || 'Status updated', 'success');
+        fetchAds(true);
       }
     } catch (err: any) {
-      toggleLocalAdStatus(id);
-      fetchAds();
-      showToast('Status updated', 'success');
+      const msg = err?.response?.data?.message || 'Failed to update campaign status';
+      showToast(msg, 'err');
     }
   };
 
   const handleDeleteAd = async (id: string, title: string) => {
+    if (!id) return;
     if (!confirm(`Are you sure you want to delete ad campaign "${title}"?`)) return;
 
+    setDeletingId(id);
     try {
-      const res = await api.delete(`/ads/admin/${id}`).catch((err) => {
-        if (err.response?.status === 404 || !err.response) {
-          deleteLocalAd(id);
-          return { data: { success: true } };
-        }
-        throw err;
-      });
-
+      const res = await api.delete(`/ads/admin/${id}`);
       if (res.data?.success) {
-        deleteLocalAd(id);
-        setAds((prev) => prev.filter((a) => a._id !== id));
-        showToast('Ad campaign removed', 'success');
-        fetchAds();
+        setAds((prev) => {
+          const next = prev.filter((a) => a._id !== id && a.id !== id);
+          setAdsStats(computeStats(next));
+          return next;
+        });
+        showToast('Ad campaign deleted from database', 'success');
+        await fetchAds(true);
       }
     } catch (err: any) {
-      deleteLocalAd(id);
-      setAds((prev) => prev.filter((a) => a._id !== id));
-      showToast('Ad campaign removed', 'success');
-      fetchAds();
+      const msg = err?.response?.data?.message || 'Failed to delete ad campaign from database';
+      showToast(msg, 'err');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -331,14 +296,6 @@ export default function CampaignsListPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-800">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span>Live Counters Synced</span>
-          </span>
-
           <button
             type="button"
             onClick={() => {
@@ -582,8 +539,9 @@ export default function CampaignsListPage() {
 
                           <button
                             type="button"
-                            onClick={() => handleDeleteAd(ad._id, ad.title)}
-                            className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-700 transition-colors"
+                            disabled={deletingId === (ad._id || ad.id)}
+                            onClick={() => handleDeleteAd(ad._id || ad.id || '', ad.title)}
+                            className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title="Delete Ad"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -644,7 +602,7 @@ export default function CampaignsListPage() {
                     required
                     value={adForm.advertiser}
                     onChange={(e) => setAdForm({ ...adForm, advertiser: e.target.value })}
-                    placeholder="e.g. Wärtsilä or DNV Maritime"
+                    placeholder="e.g. Maritime Partner Corp"
                     className="w-full rounded border border-rule px-3 py-1.5 bg-white text-ink focus:border-navy-900 focus:outline-none"
                   />
                 </div>

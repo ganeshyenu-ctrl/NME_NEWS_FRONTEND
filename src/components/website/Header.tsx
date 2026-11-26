@@ -143,7 +143,7 @@ export default function Header() {
                 className="relative group/stat flex items-center gap-1.5 text-navy-900 cursor-default transition-colors py-0.5"
               >
                 <BookOpen className="h-3.5 w-3.5 text-navy-800 shrink-0" />
-                <span className="font-bold text-navy-900">{readStats.totalReads}</span>
+                <span className="font-bold text-navy-900" suppressHydrationWarning>{readStats.totalReads}</span>
 
                 {/* Hover Tooltip */}
                 <div className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-navy-900 px-2 py-0.5 text-[10px] font-medium text-white shadow-md opacity-0 group-hover/stat:opacity-100 transition-opacity duration-150 z-50">
@@ -160,7 +160,7 @@ export default function Header() {
                 className="relative group/stat flex items-center gap-1.5 text-navy-900 cursor-default transition-colors py-0.5"
               >
                 <Users className="h-3.5 w-3.5 text-navy-800 shrink-0" />
-                <span className="font-bold text-navy-900">{readStats.activeToday}</span>
+                <span className="font-bold text-navy-900" suppressHydrationWarning>{readStats.activeToday}</span>
 
                 {/* Hover Tooltip */}
                 <div className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-navy-900 px-2 py-0.5 text-[10px] font-medium text-white shadow-md opacity-0 group-hover/stat:opacity-100 transition-opacity duration-150 z-50">
@@ -222,18 +222,20 @@ export default function Header() {
           </Link>
 
           {/* Desktop Search Bar */}
-          <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center relative">
+          <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center relative" suppressHydrationWarning>
             <input
               type="search"
               placeholder="Search articles..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-64 border-b border-rule bg-transparent py-1.5 pl-2 pr-7 text-sm placeholder:text-muted focus:border-navy-900 focus:outline-none"
+              suppressHydrationWarning
             />
             <button
               type="submit"
               className="absolute right-1 text-muted hover:text-navy-900"
               aria-label="Submit search"
+              suppressHydrationWarning
             >
               <Search className="h-4 w-4" />
             </button>
@@ -347,13 +349,14 @@ export default function Header() {
         {/* Drawer Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
           {/* Mobile Instant Search */}
-          <form onSubmit={handleSearchSubmit} className="relative">
+          <form onSubmit={handleSearchSubmit} className="relative" suppressHydrationWarning>
             <input
               type="search"
               placeholder="Search news, topics, vessels..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-md border border-rule bg-wash px-3.5 py-2 pl-9 text-xs text-ink placeholder:text-muted focus:border-navy-900 focus:bg-white focus:outline-none"
+              suppressHydrationWarning
             />
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted pointer-events-none" />
           </form>
@@ -408,12 +411,12 @@ export default function Header() {
             <div className="flex items-center justify-between rounded-md bg-wash px-3 py-2 text-xs border border-rule/70">
               <span className="inline-flex items-center gap-1.5 font-medium text-navy-900" title="Total Reads">
                 <BookOpen className="h-3.5 w-3.5 text-navy-800" />
-                <strong className="font-bold">{readStats.totalReads}</strong>
+                <strong className="font-bold" suppressHydrationWarning>{readStats.totalReads}</strong>
                 <span className="text-muted text-[11px]">reads</span>
               </span>
               <span className="inline-flex items-center gap-1.5 text-navy-900 font-medium" title="Active Today">
                 <Users className="h-3.5 w-3.5 text-navy-800" />
-                <strong className="font-bold text-navy-900">{readStats.activeToday}</strong>
+                <strong className="font-bold text-navy-900" suppressHydrationWarning>{readStats.activeToday}</strong>
                 <span className="text-muted text-[11px]">active today</span>
               </span>
             </div>

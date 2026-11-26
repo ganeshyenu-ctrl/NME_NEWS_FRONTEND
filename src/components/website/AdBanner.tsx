@@ -3,11 +3,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { api } from '@/lib/api';
 import { AdCampaignItem } from '@/types';
-import {
-  getLocalAdsByPlacement,
-  recordLocalAdImpression,
-  recordLocalAdClick,
-} from '@/lib/adStorage';
 import { Megaphone, ArrowRight, ArrowUpRight, X } from 'lucide-react';
 
 interface AdBannerProps {
@@ -23,22 +18,16 @@ export default function AdBanner({ placement, className = '' }: AdBannerProps) {
 
   useEffect(() => {
     let isMounted = true;
+    impressionRecorded.current = false;
 
     const fetchAd = async () => {
       try {
-        const res = await api
-          .get('/ads/public', {
-            params: { placement },
-          })
-          .catch(() => {
-            const local = getLocalAdsByPlacement(placement);
-            return { data: { success: true, ads: local } };
-          });
+        const res = await api.get('/ads/public', {
+          params: { placement },
+        });
 
         const adsList: AdCampaignItem[] =
-          res.data?.success && Array.isArray(res.data.ads) && res.data.ads.length > 0
-            ? res.data.ads
-            : getLocalAdsByPlacement(placement);
+          res.data?.success && Array.isArray(res.data.ads) ? res.data.ads : [];
 
         // Filter out ads dismissed in this session
         const notDismissed = adsList.filter((a) => {
@@ -50,11 +39,14 @@ export default function AdBanner({ placement, className = '' }: AdBannerProps) {
         });
 
         if (notDismissed.length === 0) {
-          if (isMounted) setLoading(false);
+          if (isMounted) {
+            setAd(null);
+            setLoading(false);
+          }
           return;
         }
 
-        if (isMounted && notDismissed.length > 0) {
+        if (isMounted) {
           const randomIndex = Math.floor(Math.random() * notDismissed.length);
           const chosenAd = notDismissed[randomIndex];
           setAd(chosenAd);
@@ -62,16 +54,12 @@ export default function AdBanner({ placement, className = '' }: AdBannerProps) {
           const adId = chosenAd._id || chosenAd.id;
           if (!impressionRecorded.current && adId) {
             impressionRecorded.current = true;
-            recordLocalAdImpression(adId);
             api.post(`/ads/public/${adId}/impression`).catch(() => {});
           }
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
-          const local = getLocalAdsByPlacement(placement);
-          if (local.length > 0) {
-            setAd(local[0]);
-          }
+          setAd(null);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -89,10 +77,7 @@ export default function AdBanner({ placement, className = '' }: AdBannerProps) {
     if (!ad) return;
     const adId = ad._id || ad.id;
     if (adId) {
-      try {
-        recordLocalAdClick(adId);
-        api.post(`/ads/public/${adId}/click`).catch(() => {});
-      } catch {}
+      api.post(`/ads/public/${adId}/click`).catch(() => {});
     }
     window.open(ad.targetUrl, '_blank', 'noopener,noreferrer,sponsored');
   };

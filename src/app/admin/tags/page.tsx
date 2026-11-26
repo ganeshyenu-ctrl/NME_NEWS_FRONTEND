@@ -81,57 +81,88 @@ export default function TagsManagementPage() {
   const fetchTags = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/tags').catch(async (err) => {
-        if (err.response?.status === 404) {
-          try {
-            const artsRes = await api.get('/articles/admin/list?limit=100').catch(() => ({ data: { articles: [] } }));
-            const arts = artsRes.data?.articles || [];
-            const tagMap: Record<string, number> = {};
-            for (const a of arts) {
-              if (Array.isArray(a.tags)) {
-                for (const t of a.tags) {
-                  tagMap[t] = (tagMap[t] || 0) + 1;
+      let loadedTags: TagItem[] = [];
+
+      const res = await api.get('/tags').catch(() => null);
+      if (res?.data?.success && Array.isArray(res.data.tags) && res.data.tags.length > 0) {
+        loadedTags = res.data.tags;
+      } else {
+        // Fallback: Extract from articles or editorial default tags
+        try {
+          const artsRes = await api.get('/articles/admin/list?limit=100').catch(() =>
+            api.get('/articles/public?limit=100').catch(() => ({ data: { articles: [] } }))
+          );
+          const arts = artsRes?.data?.articles || [];
+          const tagMap: Record<string, { count: number; name: string }> = {};
+
+          for (const a of arts) {
+            if (Array.isArray(a.tags)) {
+              for (const t of a.tags) {
+                if (t && typeof t === 'string' && t.trim()) {
+                  const raw = t.trim();
+                  const norm = raw.toLowerCase();
+                  if (!tagMap[norm]) {
+                    tagMap[norm] = { count: 1, name: raw };
+                  } else {
+                    tagMap[norm].count++;
+                  }
                 }
               }
             }
+          }
 
-            const customTags = getCustomTags();
-            for (const ct of customTags) {
-              if (tagMap[ct.name] === undefined) {
-                tagMap[ct.name] = ct.articleCount || 0;
-              }
+          const DEFAULT_EDITORIAL_TAGS = [
+            'Decarbonisation',
+            'Fleet Efficiency',
+            'IMO Regulations',
+            'Commercial Shipping',
+            'Alternative Fuels',
+            'Green Corridors',
+            'Methanol',
+            'Ammonia',
+            'Digital Twins',
+            'Automation',
+            'Smart Ports',
+            'Logistics',
+            'Safety',
+            'Seafarers',
+            'Offshore',
+            'Telemetry',
+            'Maintenance',
+          ];
+
+          for (const dTag of DEFAULT_EDITORIAL_TAGS) {
+            const norm = dTag.toLowerCase();
+            if (!tagMap[norm]) {
+              tagMap[norm] = { count: 0, name: dTag };
             }
-
-            return {
-              data: {
-                success: true,
-                tags: Object.entries(tagMap).map(([name, count], idx) => ({
-                  _id: `tag-${idx}`,
-                  id: `tag-${idx}`,
-                  name,
-                  slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-                  articleCount: count,
-                })),
-              },
-            };
-          } catch (fbErr) {
-            return { data: { success: true, tags: getCustomTags() } };
           }
-        }
-        return { data: { success: true, tags: getCustomTags() } };
-      });
 
-      if (res.data?.success) {
-        const serverTags: TagItem[] = res.data.tags || [];
-        const custom = getCustomTags();
-        const combined = [...serverTags];
-        for (const ct of custom) {
-          if (!combined.some((t) => t.name.toLowerCase() === ct.name.toLowerCase())) {
-            combined.unshift(ct);
-          }
+          loadedTags = Object.values(tagMap).map(({ name, count }, idx) => ({
+            _id: `tag-${idx + 1}`,
+            id: `tag-${idx + 1}`,
+            name,
+            slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+            articleCount: count,
+            description: `Industry intelligence and editorial reporting on ${name}.`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }));
+        } catch {
+          // Keep loadedTags as is
         }
-        setTags(combined);
       }
+
+      // Merge with custom tags
+      const custom = getCustomTags();
+      const combined = [...loadedTags];
+      for (const ct of custom) {
+        if (!combined.some((t) => t.name.toLowerCase() === ct.name.toLowerCase())) {
+          combined.unshift(ct);
+        }
+      }
+
+      setTags(combined);
     } catch (err: any) {
       console.error('Failed to load tags', err);
       setTags(getCustomTags());

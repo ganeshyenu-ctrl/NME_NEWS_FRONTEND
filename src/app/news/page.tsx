@@ -66,7 +66,7 @@ function NewsListingContent() {
               Search comprehensive fleet intelligence, decarbonisation dispatches, and regulatory updates.
             </p>
 
-            <form onSubmit={handleSearchSubmit} className="flex gap-2 max-w-xl">
+            <form onSubmit={handleSearchSubmit} className="flex gap-2 max-w-xl" suppressHydrationWarning>
               <div className="relative flex-1">
                 <input
                   type="search"
@@ -74,11 +74,13 @@ function NewsListingContent() {
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search articles, keywords, topics..."
                   className="w-full rounded-md border border-rule bg-white py-2 pl-3 pr-8 text-sm focus:border-navy-900 focus:outline-none"
+                  suppressHydrationWarning
                 />
               </div>
               <button
                 type="submit"
                 className="rounded-md bg-navy-900 px-4 py-2 text-xs font-semibold text-white hover:bg-navy-800 transition-colors"
+                suppressHydrationWarning
               >
                 Search
               </button>
