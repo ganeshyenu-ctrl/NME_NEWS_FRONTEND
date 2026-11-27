@@ -24,6 +24,7 @@ import {
 export default function Header() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [currentDateStr, setCurrentDateStr] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [readStats, setReadStats] = useState({
@@ -36,6 +37,19 @@ export default function Header() {
 
   useEffect(() => {
     setMounted(true);
+
+    const updateDate = () => {
+      setCurrentDateStr(
+        new Date().toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      );
+    };
+    updateDate();
+    const dateTimer = setInterval(updateDate, 60_000);
+    return () => clearInterval(dateTimer);
   }, []);
 
   useEffect(() => {
@@ -159,18 +173,12 @@ export default function Header() {
     }
   };
 
-  const currentDateStr = new Date().toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
   return (
     <header className="border-b border-navy-900 bg-white relative">
       {/* Top Utility Bar: ONLY visible on desktop (hidden on mobile as requested) */}
       <div className="hidden md:block border-b border-rule/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-2 text-xs text-muted">
-          <span suppressHydrationWarning>{currentDateStr}</span>
+          <span className="min-w-[110px]" suppressHydrationWarning>{currentDateStr}</span>
           <span className="hidden xl:inline" suppressHydrationWarning>
             {mounted ? tagline : 'Independent Perspectives. Informed Maritime Decisions.'}
           </span>
