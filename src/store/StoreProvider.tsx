@@ -44,13 +44,13 @@ function SocketInitializer({ children }: { children: React.ReactNode }) {
       store.dispatch(setBreakingAlert(data));
       // Dynamically refresh public articles & highlights
       store.dispatch(fetchHomepageHighlights());
-      store.dispatch(fetchPublicArticles({ limit: 8 }));
+      store.dispatch(fetchPublicArticles({ limit: 50 }));
     };
 
     const onNewArticle = () => {
       // Auto-refresh when CRM publishes any article
       store.dispatch(fetchHomepageHighlights());
-      store.dispatch(fetchPublicArticles({ limit: 8 }));
+      store.dispatch(fetchPublicArticles({ limit: 50 }));
     };
 
     const onCategoriesUpdated = () => {

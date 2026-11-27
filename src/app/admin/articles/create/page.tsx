@@ -5,12 +5,12 @@ import Link from 'next/link';
 import AdminHeader from '@/components/admin/AdminHeader';
 import ArticleEditorForm from '@/components/admin/ArticleEditorForm';
 import { useAppSelector } from '@/store/hooks';
-import { isSectionEditor } from '@/lib/rbac';
+import { canCreateOrEditArticles } from '@/lib/rbac';
 import { ArrowLeft, Lock } from 'lucide-react';
 
 export default function CreateArticlePage() {
   const { user } = useAppSelector((state) => state.auth);
-  const readOnly = isSectionEditor(user);
+  const readOnly = Boolean(user && !canCreateOrEditArticles(user));
 
   return (
     <>

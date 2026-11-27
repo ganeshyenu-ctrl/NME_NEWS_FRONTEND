@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { Category, Article, MediaItem } from '@/types';
 import { useAppSelector } from '@/store/hooks';
 import CustomSelect from '@/components/ui/CustomSelect';
-import { isSectionEditor, canManageEditorial } from '@/lib/rbac';
+import { canCreateOrEditArticles, canManageEditorial } from '@/lib/rbac';
 import {
   addStoredLeadStoryId,
   removeStoredLeadStoryId,
@@ -36,7 +36,7 @@ interface Props {
 export default function ArticleEditorForm({ initialArticle, isEditMode = false }: Props) {
   const router = useRouter();
   const { user } = useAppSelector((state) => state.auth);
-  const readOnly = isSectionEditor(user);
+  const readOnly = Boolean(user && !canCreateOrEditArticles(user));
   const editorialManager = canManageEditorial(user);
   const isContributor = user?.role === 'contributor';
 

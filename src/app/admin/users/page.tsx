@@ -308,9 +308,9 @@ export default function AdminUsersPage() {
                       {
                         value: 'section_editor',
                         label: 'Section Editor',
-                        description: 'View & analysis only — read articles, calendar, and analytics',
-                        badge: 'View Only',
-                        badgeColor: 'bg-blue-50 text-blue-800 border border-blue-200',
+                        description: 'Can view, approve, reject, publish articles & manage editorial sections',
+                        badge: 'Approval & Publish',
+                        badgeColor: 'bg-sky-50 text-sky-800 border border-sky-200',
                       },
                       {
                         value: 'editor',

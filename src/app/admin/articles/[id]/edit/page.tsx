@@ -8,14 +8,14 @@ import ArticleEditorForm from '@/components/admin/ArticleEditorForm';
 import { api } from '@/lib/api';
 import { Article } from '@/types';
 import { useAppSelector } from '@/store/hooks';
-import { isSectionEditor } from '@/lib/rbac';
+import { canCreateOrEditArticles } from '@/lib/rbac';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 
 export default function EditArticlePage() {
   const params = useParams();
   const id = params.id as string;
   const { user } = useAppSelector((state) => state.auth);
-  const readOnly = isSectionEditor(user);
+  const readOnly = Boolean(user && !canCreateOrEditArticles(user));
 
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
