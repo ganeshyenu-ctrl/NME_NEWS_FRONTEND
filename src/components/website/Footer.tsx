@@ -61,7 +61,7 @@ export default function Footer() {
             </div>
 
             <div className="pt-2 text-xs text-navy-100/50">
-              © {new Date().getFullYear()} Navigating Marine Excellence. All rights reserved.
+              © {new Date().getFullYear()} Charter Fleet Marine. All rights reserved.
             </div>
           </div>
 

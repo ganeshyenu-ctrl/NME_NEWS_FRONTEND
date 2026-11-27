@@ -99,7 +99,7 @@ export default function SecureAdminLoginPage() {
 
         {/* Bottom: Copyright */}
         <div className="relative z-10 pt-4 border-t border-white/10 text-xs text-white/60">
-          <span>© 2026 Navigating Marine Excellence. All rights reserved.</span>
+          <span>© 2026 Charter Fleet Marine. All rights reserved.</span>
         </div>
       </div>
 
