@@ -232,6 +232,16 @@ export interface AnalyticsOverview {
     pageViews: number;
     uniqueVisitors: number;
   }>;
+  peakReadsDay?: {
+    date: string;
+    pageViews: number;
+    uniqueVisitors: number;
+  } | null;
+  peakActiveUsersDay?: {
+    date: string;
+    pageViews: number;
+    uniqueVisitors: number;
+  } | null;
 }
 
 export interface AdCampaignItem {

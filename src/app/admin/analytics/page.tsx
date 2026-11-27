@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import { AnalyticsOverview } from '@/types';
 import {
   BarChart3,
@@ -14,15 +15,30 @@ import {
   UserCheck,
   CheckCircle2,
   Calendar,
+  Award,
+  RefreshCw,
 } from 'lucide-react';
+
+const formatAnalyticsDate = (dateStr?: string) => {
+  if (!dateStr) return '—';
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return dateStr;
+  const [y, m, d] = parts;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+};
 
 export default function AnalyticsDashboardPage() {
   const [data, setData] = useState<AnalyticsOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const res = await api.get('/analytics/overview').catch(async (err) => {
         if (err.response?.status === 404) {
           // Graceful fallback to existing production endpoints if /analytics/overview is not yet deployed
@@ -97,6 +113,8 @@ export default function AnalyticsDashboardPage() {
                     PUBLISHED: stats.published || 0,
                   },
                   dailyTraffic: [],
+                  peakReadsDay: null,
+                  peakActiveUsersDay: null,
                 },
               },
             };
@@ -113,13 +131,44 @@ export default function AnalyticsDashboardPage() {
     } catch (err: any) {
       console.error('Failed to load analytics', err);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchAnalytics();
-  }, []);
+    fetchAnalytics(false);
+
+    const socket = getSocket();
+    const handleLiveUpdate = () => {
+      fetchAnalytics(true);
+    };
+    socket.on('readership_stats_updated', handleLiveUpdate);
+
+    return () => {
+      socket.off('readership_stats_updated', handleLiveUpdate);
+    };
+  }, [fetchAnalytics]);
+
+  const dailyTrafficNewest = [...(data?.dailyTraffic || [])].reverse();
+  const maxDailyViews = Math.max(1, ...dailyTrafficNewest.map((d) => d.pageViews || 0));
+  const peakReadsDay =
+    data?.peakReadsDay ||
+    (dailyTrafficNewest.length > 0
+      ? dailyTrafficNewest.reduce((best, cur) =>
+          (cur.pageViews || 0) > (best.pageViews || 0) ? cur : best
+        )
+      : null);
+  const peakActiveUsersDay =
+    data?.peakActiveUsersDay ||
+    (dailyTrafficNewest.length > 0
+      ? dailyTrafficNewest.reduce((best, cur) => {
+          const curU = cur.uniqueVisitors || 0;
+          const bestU = best.uniqueVisitors || 0;
+          if (curU !== bestU) return curU > bestU ? cur : best;
+          return (cur.pageViews || 0) > (best.pageViews || 0) ? cur : best;
+        })
+      : null);
+  const topArticle = data?.mostRead?.[0] || null;
 
   const maxViews = Math.max(1, ...(data?.mostRead || []).map((a) => a.views));
   const maxCatViews = Math.max(1, ...(data?.viewsByCategory || []).map((c) => c.views));
@@ -129,14 +178,25 @@ export default function AnalyticsDashboardPage() {
   return (
     <div className="flex-1 bg-wash p-6 md:p-8 space-y-6">
       {/* Header */}
-      <div className="border-b border-rule pb-4">
-        <h1 className="font-serif text-2xl md:text-3xl font-bold tracking-tight text-navy-900 flex items-center gap-2.5">
-          <BarChart3 className="h-6 w-6 text-navy-900" />
-          <span>Analytics &amp; Intelligence</span>
-        </h1>
-        <p className="text-xs text-muted mt-1">
-          From the site&rsquo;s own real data: article readership views, editorial output, and subscriber engagement.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-rule pb-4">
+        <div>
+          <h1 className="font-serif text-2xl md:text-3xl font-bold tracking-tight text-navy-900 flex items-center gap-2.5">
+            <BarChart3 className="h-6 w-6 text-navy-900" />
+            <span>Analytics &amp; Intelligence</span>
+          </h1>
+          <p className="text-xs text-muted mt-1">
+            From the site&rsquo;s own real data: article readership views, peak daily traffic, editorial output, and subscriber engagement.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => fetchAnalytics(false)}
+          className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-md border border-rule bg-white px-3 py-2 text-xs font-semibold text-navy-900 hover:bg-wash transition-colors shadow-xs"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh Data</span>
+        </button>
       </div>
 
 
@@ -187,6 +247,150 @@ export default function AnalyticsDashboardPage() {
           </p>
         </div>
       </div>
+
+      {/* Peak Day & Highest Readership Highlights */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-lg border border-rule bg-white p-5 space-y-2 shadow-xs">
+          <div className="flex items-center justify-between text-muted">
+            <span className="text-[11px] font-bold uppercase tracking-wider">
+              Peak Active Users Day
+            </span>
+            <Calendar className="h-4 w-4 text-navy-900" />
+          </div>
+          {loading ? (
+            <p className="text-sm text-muted">Loading...</p>
+          ) : peakActiveUsersDay ? (
+            <>
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <p className="font-serif text-2xl font-bold text-navy-900">
+                  {formatAnalyticsDate(peakActiveUsersDay.date)}
+                </p>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                  {(peakActiveUsersDay.uniqueVisitors || 0).toLocaleString('en-GB')} unique visitors
+                </span>
+              </div>
+              <p className="text-xs text-muted">
+                Highest daily active readership on record:{' '}
+                <strong className="text-navy-900">
+                  {(peakActiveUsersDay.pageViews || 0).toLocaleString('en-GB')} active reads
+                </strong>{' '}
+                on {formatAnalyticsDate(peakActiveUsersDay.date)}.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted">No daily traffic records recorded yet.</p>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-rule bg-white p-5 space-y-2 shadow-xs">
+          <div className="flex items-center justify-between text-muted">
+            <span className="text-[11px] font-bold uppercase tracking-wider">
+              Highest Reads Day &amp; Top Story
+            </span>
+            <Award className="h-4 w-4 text-navy-900" />
+          </div>
+          {loading ? (
+            <p className="text-sm text-muted">Loading...</p>
+          ) : (
+            <>
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <p className="font-serif text-2xl font-bold text-navy-900">
+                  {peakReadsDay
+                    ? `${(peakReadsDay.pageViews || 0).toLocaleString('en-GB')} reads`
+                    : '0 reads'}
+                </p>
+                {peakReadsDay && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-navy-50 border border-navy-200 px-2.5 py-0.5 text-xs font-bold text-navy-900">
+                    Peak Day: {formatAnalyticsDate(peakReadsDay.date)}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted truncate">
+                {topArticle ? (
+                  <>
+                    Most-read article:{' '}
+                    <Link
+                      href={`/admin/articles/${topArticle.id || topArticle._id}/edit`}
+                      className="font-semibold text-navy-900 hover:underline"
+                    >
+                      {topArticle.headline}
+                    </Link>{' '}
+                    ({topArticle.views.toLocaleString('en-GB')} reads)
+                  </>
+                ) : (
+                  'No published article views recorded yet.'
+                )}
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Day-by-Day Readership & Active Users Breakdown */}
+      <section className="rounded-lg border border-rule bg-white p-5 space-y-4 shadow-xs">
+        <div className="flex items-center justify-between border-b border-rule pb-2">
+          <h2 className="font-serif text-base font-bold text-navy-900 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-navy-900" />
+            <span>Daily Active Users &amp; Reads History</span>
+          </h2>
+          <span className="text-[11px] text-muted">
+            {dailyTrafficNewest.length} recorded {dailyTrafficNewest.length === 1 ? 'day' : 'days'}
+          </span>
+        </div>
+
+        {loading ? (
+          <p className="text-xs text-muted py-4">Loading daily traffic...</p>
+        ) : dailyTrafficNewest.length === 0 ? (
+          <p className="text-xs text-muted py-4">No daily traffic records found yet.</p>
+        ) : (
+          <div className="space-y-3 pt-1">
+            {dailyTrafficNewest.map((day) => {
+              const isPeakReads = peakReadsDay?.date === day.date;
+              const isPeakUsers = peakActiveUsersDay?.date === day.date;
+              return (
+                <div key={day.date} className="space-y-1 text-xs">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-navy-900">
+                        {formatAnalyticsDate(day.date)}
+                      </span>
+                      {isPeakReads && (
+                        <span className="rounded bg-navy-900 text-white px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                          Peak Reads
+                        </span>
+                      )}
+                      {isPeakUsers && (
+                        <span className="rounded bg-emerald-100 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                          Peak Active
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 font-mono">
+                      <span className="text-muted">
+                        <strong className="text-navy-900">
+                          {(day.uniqueVisitors || 0).toLocaleString('en-GB')}
+                        </strong>{' '}
+                        unique visitors
+                      </span>
+                      <span className="font-bold text-navy-900">
+                        {(day.pageViews || 0).toLocaleString('en-GB')} reads
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-wash overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isPeakReads ? 'bg-emerald-600' : 'bg-navy-900'
+                      }`}
+                      style={{ width: `${((day.pageViews || 0) / maxDailyViews) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* 2x2 Grid of Intelligence Bars */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
