@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAppSelector } from '@/store/hooks';
+import { canManageEditorial } from '@/lib/rbac';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -56,7 +57,7 @@ export default function EditorialCalendarPage() {
   const [submittingSchedule, setSubmittingSchedule] = useState(false);
   const [isCheckingAutoPublish, setIsCheckingAutoPublish] = useState(false);
 
-  const canPublish = user?.role === 'admin' || user?.role === 'editor';
+  const canPublish = canManageEditorial(user);
 
   const fetchData = async () => {
     try {

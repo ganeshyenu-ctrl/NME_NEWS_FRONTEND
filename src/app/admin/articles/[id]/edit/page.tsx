@@ -7,11 +7,15 @@ import AdminHeader from '@/components/admin/AdminHeader';
 import ArticleEditorForm from '@/components/admin/ArticleEditorForm';
 import { api } from '@/lib/api';
 import { Article } from '@/types';
+import { useAppSelector } from '@/store/hooks';
+import { isSectionEditor } from '@/lib/rbac';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 
 export default function EditArticlePage() {
   const params = useParams();
   const id = params.id as string;
+  const { user } = useAppSelector((state) => state.auth);
+  const readOnly = isSectionEditor(user);
 
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
@@ -19,13 +23,14 @@ export default function EditArticlePage() {
   useEffect(() => {
     const fetchArticle = async () => {
       try {
-        // Fetch from admin articles list
-        const res = await api.get('/articles/admin/list');
-        if (res.data?.articles) {
+        const res = await api.get(`/articles/admin/${id}`).catch(async () => {
+          return api.get('/articles/admin/list', { params: { limit: 100 } });
+        });
+        if (res.data?.article) {
+          setArticle(res.data.article);
+        } else if (res.data?.articles) {
           const found = res.data.articles.find((a: Article) => a._id === id);
-          if (found) {
-            setArticle(found);
-          }
+          if (found) setArticle(found);
         }
       } catch (err) {
       } finally {
@@ -40,7 +45,7 @@ export default function EditArticlePage() {
   return (
     <>
       <AdminHeader
-        title="Edit Article"
+        title={readOnly ? 'View Article (Read-Only)' : 'Edit Article'}
         actions={
           <div className="flex items-center gap-2">
             {article?.status === 'published' && (

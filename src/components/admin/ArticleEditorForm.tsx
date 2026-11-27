@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { Category, Article, MediaItem } from '@/types';
 import { useAppSelector } from '@/store/hooks';
 import CustomSelect from '@/components/ui/CustomSelect';
+import { isSectionEditor, canManageEditorial } from '@/lib/rbac';
 import {
   addStoredLeadStoryId,
   removeStoredLeadStoryId,
@@ -23,6 +24,7 @@ import {
   AlertCircle,
   Upload,
   X,
+  XCircle,
   Check,
 } from 'lucide-react';
 
@@ -34,6 +36,9 @@ interface Props {
 export default function ArticleEditorForm({ initialArticle, isEditMode = false }: Props) {
   const router = useRouter();
   const { user } = useAppSelector((state) => state.auth);
+  const readOnly = isSectionEditor(user);
+  const editorialManager = canManageEditorial(user);
+  const isContributor = user?.role === 'contributor';
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [title, setTitle] = useState(initialArticle?.title || '');
@@ -45,8 +50,8 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
       ? initialArticle.category._id
       : (initialArticle?.category as string) || ''
   );
-  const [status, setStatus] = useState<'draft' | 'published' | 'scheduled'>(
-    initialArticle?.status || 'draft'
+  const [status, setStatus] = useState<'draft' | 'under_review' | 'approved' | 'rejected' | 'published' | 'scheduled'>(
+    initialArticle?.status || (user?.role === 'contributor' ? 'under_review' : 'draft')
   );
   const [isLead, setIsLead] = useState(
     Boolean(initialArticle?.isLead || (initialArticle?._id && isStoredLeadStory(initialArticle._id)))
@@ -137,7 +142,8 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
     loadCategories();
   }, []);
 
-  const handleSave = async (targetStatus?: 'draft' | 'published' | 'scheduled') => {
+  const handleSave = async (targetStatus?: 'draft' | 'under_review' | 'approved' | 'rejected' | 'published' | 'scheduled') => {
+    if (readOnly) return;
     setFeedback(null);
     const finalStatus = targetStatus || status;
 
@@ -174,14 +180,29 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
         } else {
           removeStoredLeadStoryId(initialArticle._id);
         }
-        setFeedback({ type: 'success', message: 'Article updated successfully!' });
+        setStatus(finalStatus);
+        setFeedback({
+          type: 'success',
+          message:
+            finalStatus === 'under_review'
+              ? 'Article submitted to Senior Editor for approval!'
+              : finalStatus === 'published'
+              ? 'Article approved and published to live wire!'
+              : 'Article updated successfully!',
+        });
       } else {
         const res = await api.post('/articles/admin', payload);
         const createdId = res.data?.article?._id;
         if (createdId && isLead) {
           addStoredLeadStoryId(createdId);
         }
-        setFeedback({ type: 'success', message: 'Article created successfully!' });
+        setFeedback({
+          type: 'success',
+          message:
+            finalStatus === 'under_review'
+              ? 'Article submitted to Senior Editor for approval!'
+              : 'Article created successfully!',
+        });
         setTimeout(() => {
           router.push(`/admin/articles/${res.data.article._id}/edit`);
         }, 1000);
@@ -197,7 +218,17 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_20rem] gap-8">
+    <div className="space-y-4">
+      {readOnly && (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-900">
+          <Eye className="h-4 w-4 text-blue-700 shrink-0" />
+          <span>
+            Section Editor View-Only Mode: You can inspect full article content and metrics for analysis, but editing and publishing are disabled.
+          </span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_20rem] gap-8">
       {/* Left Column: Content Canvas */}
       <div className="space-y-6">
         {feedback && (
@@ -226,10 +257,11 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
             <input
               type="text"
               required
+              disabled={readOnly}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter comprehensive editorial headline..."
-              className="w-full font-serif text-2xl font-bold text-navy-900 border-b border-rule pb-2 focus:border-navy-900 focus:outline-none placeholder:text-muted/40"
+              className="w-full font-serif text-2xl font-bold text-navy-900 border-b border-rule pb-2 focus:border-navy-900 focus:outline-none placeholder:text-muted/40 disabled:bg-transparent disabled:opacity-80"
             />
           </div>
 
@@ -240,10 +272,11 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
             </label>
             <textarea
               rows={2}
+              disabled={readOnly}
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               placeholder="A three-line deck expanding on the headline with factual context and operational consequence..."
-              className="w-full text-sm text-ink border-b border-rule pb-2 focus:border-navy-900 focus:outline-none placeholder:text-muted/40 resize-none"
+              className="w-full text-sm text-ink border-b border-rule pb-2 focus:border-navy-900 focus:outline-none placeholder:text-muted/40 resize-none disabled:bg-transparent disabled:opacity-80"
             />
           </div>
 
@@ -256,10 +289,11 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
               <span className="bg-wash px-2 py-1.5 border border-r-0 border-rule rounded-l">/articles/</span>
               <input
                 type="text"
+                disabled={readOnly}
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="sample-headline-url"
-                className="flex-1 rounded-r border border-rule px-2 py-1.5 text-xs text-ink focus:border-navy-900 focus:outline-none font-mono"
+                className="flex-1 rounded-r border border-rule px-2 py-1.5 text-xs text-ink focus:border-navy-900 focus:outline-none font-mono disabled:bg-wash/40"
               />
             </div>
           </div>
@@ -275,10 +309,11 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
             <textarea
               rows={16}
               required
+              disabled={readOnly}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="<p>Write your detailed maritime analysis here...</p>"
-              className="w-full rounded-md border border-rule bg-white p-4 font-mono text-xs leading-relaxed text-ink focus:border-navy-900 focus:outline-none focus:ring-1 focus:ring-navy-100"
+              className="w-full rounded-md border border-rule bg-white p-4 font-mono text-xs leading-relaxed text-ink focus:border-navy-900 focus:outline-none focus:ring-1 focus:ring-navy-100 disabled:bg-wash/40"
             />
           </div>
         </div>
@@ -297,17 +332,31 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
             <CustomSelect
               value={status}
               onChange={(val) => setStatus(val as any)}
-              disabled={user?.role === 'contributor'}
+              disabled={readOnly}
               options={[
                 {
                   value: 'draft',
                   label: 'Draft',
-                  description: 'Work in progress / private to newsroom',
+                  description: 'Work in progress / private draft',
                   badge: 'Draft',
                   badgeColor: 'bg-rule/60 text-ink',
                 },
-                ...(user?.role !== 'contributor'
+                {
+                  value: 'under_review',
+                  label: 'Pending Approval',
+                  description: 'Submitted to Senior Editor for review & approval',
+                  badge: 'Approval',
+                  badgeColor: 'bg-blue-100 text-blue-900 border border-blue-200',
+                },
+                ...(!isContributor
                   ? [
+                      {
+                        value: 'rejected',
+                        label: 'Rejected',
+                        description: 'Declined during editorial review',
+                        badge: 'Rejected',
+                        badgeColor: 'bg-rose-100 text-rose-900 border border-rose-200',
+                      },
                       {
                         value: 'scheduled',
                         label: 'Scheduled',
@@ -326,9 +375,9 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
                   : []),
               ]}
             />
-            {user?.role === 'contributor' && (
+            {isContributor && (
               <p className="mt-1.5 text-[11px] text-muted italic">
-                Contributors submit drafts for editorial review and approval.
+                Articles submitted for approval appear in the Senior Editor&rsquo;s Article Approval tab.
               </p>
             )}
           </div>
@@ -354,6 +403,7 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
             <CustomSelect
               value={categoryId}
               onChange={(val) => setCategoryId(val)}
+              disabled={readOnly}
               showColorDot={true}
               placeholder="Select Sector / Category..."
               options={categories.map((cat) => ({
@@ -371,9 +421,10 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
+                  disabled={readOnly || isContributor}
                   checked={isLead}
                   onChange={(e) => setIsLead(e.target.checked)}
-                  className="h-4 w-4 rounded border-rule text-navy-900 focus:ring-navy-700"
+                  className="h-4 w-4 rounded border-rule text-navy-900 focus:ring-navy-700 disabled:opacity-50"
                 />
                 <span className="font-semibold text-navy-900">Feature as Lead Story</span>
               </label>
@@ -385,9 +436,10 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
+                disabled={readOnly || isContributor}
                 checked={isBreaking}
                 onChange={(e) => setIsBreaking(e.target.checked)}
-                className="h-4 w-4 rounded border-rule text-signal focus:ring-signal"
+                className="h-4 w-4 rounded border-rule text-signal focus:ring-signal disabled:opacity-50"
               />
               <span className="font-semibold text-signal">Broadcast as Breaking Alert</span>
             </label>
@@ -397,32 +449,37 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
           <div className="pt-2 border-t border-rule space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-semibold text-navy-900">Featured Image</label>
-              <button
-                type="button"
-                onClick={handleOpenMediaModal}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-navy-700 hover:text-navy-900 hover:underline"
-              >
-                <ImageIcon className="h-3 w-3" />
-                <span>Media Library</span>
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={handleOpenMediaModal}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-navy-700 hover:text-navy-900 hover:underline"
+                >
+                  <ImageIcon className="h-3 w-3" />
+                  <span>Media Library</span>
+                </button>
+              )}
             </div>
 
             <div className="flex gap-2">
               <input
                 type="text"
+                disabled={readOnly}
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="/uploads/... or https://..."
-                className="flex-1 rounded border border-rule px-3 py-1.5 text-xs text-ink focus:outline-none"
+                className="flex-1 rounded border border-rule px-3 py-1.5 text-xs text-ink focus:outline-none disabled:bg-wash/40"
               />
-              <button
-                type="button"
-                onClick={handleOpenMediaModal}
-                className="rounded border border-rule bg-wash px-2.5 py-1 text-xs font-semibold text-navy-900 hover:bg-rule/50"
-                title="Browse Media Library"
-              >
-                Browse
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={handleOpenMediaModal}
+                  className="rounded border border-rule bg-wash px-2.5 py-1 text-xs font-semibold text-navy-900 hover:bg-rule/50"
+                  title="Browse Media Library"
+                >
+                  Browse
+                </button>
+              )}
             </div>
 
             {imageUrl && (
@@ -432,10 +489,11 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
             )}
             <input
               type="text"
+              disabled={readOnly}
               value={imageCaption}
               onChange={(e) => setImageCaption(e.target.value)}
               placeholder="Image caption / attribution..."
-              className="w-full rounded border border-rule px-3 py-1 text-[11px] text-muted focus:outline-none"
+              className="w-full rounded border border-rule px-3 py-1 text-[11px] text-muted focus:outline-none disabled:bg-wash/40"
             />
           </div>
 
@@ -444,60 +502,97 @@ export default function ArticleEditorForm({ initialArticle, isEditMode = false }
             <label className="block text-xs font-semibold text-navy-900">Estimated Read Time</label>
             <input
               type="text"
+              disabled={readOnly}
               value={readTime}
               onChange={(e) => setReadTime(e.target.value)}
               placeholder="e.g. 4 min read"
-              className="w-full rounded border border-rule px-3 py-1.5 text-xs text-ink focus:outline-none"
+              className="w-full rounded border border-rule px-3 py-1.5 text-xs text-ink focus:outline-none disabled:bg-wash/40"
             />
 
             <label className="block text-xs font-semibold text-navy-900 pt-2">Tags (Comma-separated)</label>
             <input
               type="text"
+              disabled={readOnly}
               value={tagsStr}
               onChange={(e) => setTagsStr(e.target.value)}
               placeholder="Decarbonisation, IMO, Shipping"
-              className="w-full rounded border border-rule px-3 py-1.5 text-xs text-ink focus:outline-none"
+              className="w-full rounded border border-rule px-3 py-1.5 text-xs text-ink focus:outline-none disabled:bg-wash/40"
             />
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-4 border-t border-rule space-y-2">
-            {user?.role === 'contributor' ? (
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => handleSave('draft')}
-                className="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-navy-900 px-4 py-2 text-xs font-semibold text-white hover:bg-navy-800 disabled:opacity-50 transition-colors"
-              >
-                <Send className="h-3.5 w-3.5" />
-                <span>{saving ? 'Submitting...' : 'Submit Draft for Editorial Review'}</span>
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => handleSave('published')}
-                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-navy-900 px-4 py-2 text-xs font-semibold text-white hover:bg-navy-800 disabled:opacity-50 transition-colors"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  <span>{saving ? 'Publishing...' : 'Publish to Live Wire'}</span>
-                </button>
+          {!readOnly && (
+            <div className="pt-4 border-t border-rule space-y-2">
+              {isContributor ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => handleSave('under_review')}
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-navy-900 px-4 py-2 text-xs font-semibold text-white hover:bg-navy-800 disabled:opacity-50 transition-colors"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    <span>{saving ? 'Submitting...' : 'Submit to Senior Editor for Approval'}</span>
+                  </button>
 
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => handleSave('draft')}
-                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-rule bg-wash px-4 py-2 text-xs font-semibold text-navy-900 hover:bg-rule/60 disabled:opacity-50 transition-colors"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  <span>Save as Draft</span>
-                </button>
-              </>
-            )}
-          </div>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => handleSave('draft')}
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-rule bg-wash px-4 py-2 text-xs font-semibold text-navy-900 hover:bg-rule/60 disabled:opacity-50 transition-colors"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    <span>Save as Draft</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => handleSave('published')}
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-navy-900 px-4 py-2 text-xs font-semibold text-white hover:bg-navy-800 disabled:opacity-50 transition-colors"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    <span>
+                      {saving
+                        ? 'Publishing...'
+                        : status === 'under_review'
+                        ? 'Approve & Publish to Live Wire'
+                        : 'Publish to Live Wire'}
+                    </span>
+                  </button>
+
+                  {editorialManager && status === 'under_review' && (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => handleSave('rejected')}
+                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-50 transition-colors"
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                      <span>Reject Article</span>
+                    </button>
+                  )}
+
+                  {status !== 'under_review' && (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => handleSave('draft')}
+                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-rule bg-wash px-4 py-2 text-xs font-semibold text-navy-900 hover:bg-rule/60 disabled:opacity-50 transition-colors"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      <span>Save as Draft</span>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </aside>
+      </div>
 
       {/* Media Library Selector Modal */}
       {mediaModalOpen && (

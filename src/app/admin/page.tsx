@@ -6,6 +6,7 @@ import AdminHeader from '@/components/admin/AdminHeader';
 import { api } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { useAppSelector } from '@/store/hooks';
+import { isSectionEditor } from '@/lib/rbac';
 import {
   FileText,
   Clock,
@@ -26,6 +27,8 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const { liveEditorialEvents } = useAppSelector((state) => state.socket);
+  const { user } = useAppSelector((state) => state.auth);
+  const readOnlySectionEditor = isSectionEditor(user);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -63,13 +66,15 @@ export default function AdminDashboardPage() {
       <AdminHeader
         title="Dashboard"
         actions={
-          <Link
-            href="/admin/articles/create"
-            className="inline-flex items-center gap-1.5 rounded-md bg-navy-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-navy-800 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Create Article</span>
-          </Link>
+          !readOnlySectionEditor ? (
+            <Link
+              href="/admin/articles/create"
+              className="inline-flex items-center gap-1.5 rounded-md bg-navy-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-navy-800 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create Article</span>
+            </Link>
+          ) : undefined
         }
       />
 

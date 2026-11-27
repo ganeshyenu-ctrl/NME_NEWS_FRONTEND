@@ -6,6 +6,7 @@ import AdminHeader from '@/components/admin/AdminHeader';
 import { api } from '@/lib/api';
 import { User } from '@/types';
 import { useAppSelector } from '@/store/hooks';
+import { getRoleLabel } from '@/lib/rbac';
 import CustomSelect from '@/components/ui/CustomSelect';
 import { Plus, UserPlus, Shield, X, Trash2, Edit2, Lock } from 'lucide-react';
 
@@ -19,7 +20,7 @@ export default function AdminUsersPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'editor' | 'contributor'>('contributor');
+  const [role, setRole] = useState<'admin' | 'editor' | 'section_editor' | 'contributor'>('contributor');
   const [canPublish, setCanPublish] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -51,7 +52,7 @@ export default function AdminUsersPage() {
     setModalOpen(true);
   };
 
-  const handleRoleChange = (newRole: 'admin' | 'editor' | 'contributor') => {
+  const handleRoleChange = (newRole: 'admin' | 'editor' | 'section_editor' | 'contributor') => {
     setRole(newRole);
     if (newRole === 'admin' || newRole === 'editor') {
       setCanPublish(true);
@@ -179,8 +180,8 @@ export default function AdminUsersPage() {
                       </td>
                       <td className="px-5 py-3 font-mono text-muted">{u.email}</td>
                       <td className="px-5 py-3 whitespace-nowrap">
-                        <span className="rounded bg-navy-50 border border-navy-100 px-2 py-0.5 text-[11px] font-medium text-navy-700 capitalize">
-                          {u.role}
+                        <span className="rounded bg-navy-50 border border-navy-100 px-2 py-0.5 text-[11px] font-medium text-navy-700">
+                          {getRoleLabel(u.role, u.canPublish)}
                         </span>
                       </td>
                       <td className="px-5 py-3 whitespace-nowrap">
@@ -300,15 +301,22 @@ export default function AdminUsersPage() {
                       {
                         value: 'contributor',
                         label: 'Contributor',
-                        description: 'Can draft articles; submits for editorial approval',
-                        badge: 'Draft only',
+                        description: 'Can write articles and submit to Senior Editor for approval',
+                        badge: 'Submit Only',
                         badgeColor: 'bg-rule/60 text-ink',
                       },
                       {
+                        value: 'section_editor',
+                        label: 'Section Editor',
+                        description: 'View & analysis only — read articles, calendar, and analytics',
+                        badge: 'View Only',
+                        badgeColor: 'bg-blue-50 text-blue-800 border border-blue-200',
+                      },
+                      {
                         value: 'editor',
-                        label: 'Editor',
-                        description: 'Can create, edit, approve, publish articles & manage media',
-                        badge: 'Editorial',
+                        label: 'Senior Editor',
+                        description: 'Reviews Contributor approvals, edits, schedules & publishes articles',
+                        badge: 'Approval & Publish',
                         badgeColor: 'bg-navy-100 text-navy-900',
                       },
                       {

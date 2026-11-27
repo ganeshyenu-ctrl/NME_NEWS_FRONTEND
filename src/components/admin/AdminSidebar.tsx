@@ -8,6 +8,13 @@ import { logoutUser } from '@/store/slices/authSlice';
 import { useAdminSidebar } from './AdminSidebarContext';
 import { SECURE_ADMIN_LOGIN_PATH } from '@/config/routes';
 import {
+  isAdmin,
+  isSectionEditor,
+  canManageEditorial,
+  canCreateOrEditArticles,
+  getRoleLabel,
+} from '@/lib/rbac';
+import {
   LayoutDashboard,
   FileText,
   SquarePen,
@@ -43,13 +50,22 @@ export default function AdminSidebar() {
     router.push(SECURE_ADMIN_LOGIN_PATH);
   };
 
+  const sectionEditor = isSectionEditor(user);
+  const editorialManager = canManageEditorial(user);
+  const canAuthor = canCreateOrEditArticles(user);
+  const adminUser = isAdmin(user);
+
   const navItems = [
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { label: 'Articles', href: '/admin/articles', icon: FileText },
     { label: 'Editorial Calendar', href: '/admin/calendar', icon: Calendar },
-    { label: 'Create Article', href: '/admin/articles/create', icon: SquarePen },
-    { label: 'Media Library', href: '/admin/media', icon: ImageIcon },
-    ...(user?.role === 'admin' || user?.role === 'editor'
+    ...(canAuthor
+      ? [
+          { label: 'Create Article', href: '/admin/articles/create', icon: SquarePen },
+          { label: 'Media Library', href: '/admin/media', icon: ImageIcon },
+        ]
+      : []),
+    ...(editorialManager
       ? [
           { label: 'Comments', href: '/admin/comments', icon: MessageSquare },
           { label: 'Categories', href: '/admin/categories', icon: FolderTree },
@@ -57,11 +73,13 @@ export default function AdminSidebar() {
           { label: 'Newsletter', href: '/admin/newsletter', icon: Mail },
           { label: 'Subscribers', href: '/admin/subscribers', icon: UserPlus },
           { label: 'Ad Campaigns', href: '/admin/campaigns', icon: Megaphone },
-          { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
         ]
       : []),
+    ...(editorialManager || sectionEditor
+      ? [{ label: 'Analytics', href: '/admin/analytics', icon: BarChart3 }]
+      : []),
     { label: 'My Profile', href: '/admin/profile', icon: UserCheck },
-    ...(user?.role === 'admin'
+    ...(adminUser
       ? [
           { label: 'Users & Roles', href: '/admin/users', icon: Users },
           { label: 'Audit Logs', href: '/admin/audit-log', icon: ShieldAlert },
@@ -197,7 +215,9 @@ export default function AdminSidebar() {
               <p className="text-xs font-semibold text-white truncate group-hover:text-blue-300 transition-colors">
                 {user?.name || 'Administrator'}
               </p>
-              <p className="text-[10px] text-navy-100/60 uppercase tracking-wider">{user?.role || 'admin'}</p>
+              <p className="text-[10px] text-navy-100/60 uppercase tracking-wider">
+                {getRoleLabel(user?.role, user?.canPublish)}
+              </p>
             </Link>
             <button
               onClick={handleLogout}

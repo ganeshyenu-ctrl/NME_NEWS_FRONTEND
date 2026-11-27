@@ -3,7 +3,7 @@ export interface User {
   _id?: string;
   name: string;
   email: string;
-  role: 'admin' | 'editor' | 'contributor';
+  role: 'admin' | 'editor' | 'section_editor' | 'contributor';
   canPublish: boolean;
   status: 'active' | 'inactive';
   avatar?: string;
@@ -34,7 +34,7 @@ export interface Article {
   categoryName?: string;
   author: User | string;
   authorName?: string;
-  status: 'draft' | 'published' | 'scheduled';
+  status: 'draft' | 'under_review' | 'approved' | 'rejected' | 'scheduled' | 'published';
   isLead: boolean;
   isBreaking: boolean;
   featuredImage?: {

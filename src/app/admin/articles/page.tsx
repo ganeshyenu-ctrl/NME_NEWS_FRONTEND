@@ -4,8 +4,10 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { api } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import { Article } from '@/types';
 import { useAppSelector } from '@/store/hooks';
+import { isAdmin, isSectionEditor, isSeniorEditor, canManageEditorial, getRoleLabel } from '@/lib/rbac';
 import {
   Plus,
   Search,
@@ -22,6 +24,8 @@ import {
   X,
   Flame,
   CheckCircle2,
+  Eye,
+  XCircle,
 } from 'lucide-react';
 import {
   isStoredLeadStory,
@@ -34,11 +38,17 @@ type SortDirection = 'asc' | 'desc';
 export default function AdminArticlesPage() {
   const { user: currentUser } = useAppSelector((state) => state.auth);
   const { categories } = useAppSelector((state) => state.categories);
+  const readOnlySectionEditor = isSectionEditor(currentUser);
+  const seniorEditor = isSeniorEditor(currentUser);
+  const adminUser = isAdmin(currentUser);
+  const editorialManager = canManageEditorial(currentUser);
 
   const [articles, setArticles] = useState<Article[]>([]);
-  const [usersMap, setUsersMap] = useState<Record<string, { role: string; name: string }>>({});
+  const [usersMap, setUsersMap] = useState<Record<string, { role: string; canPublish?: boolean; name: string }>>({});
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+  const [processingApprovalId, setProcessingApprovalId] = useState<string | null>(null);
 
   // Lead Story Toggling & Notice State
   const [togglingLeadId, setTogglingLeadId] = useState<string | null>(null);
@@ -64,11 +74,11 @@ export default function AdminArticlesPage() {
       .get('/users')
       .then((res) => {
         if (res.data?.users) {
-          const map: Record<string, { role: string; name: string }> = {};
+          const map: Record<string, { role: string; canPublish?: boolean; name: string }> = {};
           res.data.users.forEach((u: any) => {
-            if (u._id) map[u._id] = { role: u.role, name: u.name };
-            if (u.id) map[u.id] = { role: u.role, name: u.name };
-            if (u.name) map[u.name.toLowerCase().trim()] = { role: u.role, name: u.name };
+            if (u._id) map[u._id] = { role: u.role, canPublish: u.canPublish, name: u.name };
+            if (u.id) map[u.id] = { role: u.role, canPublish: u.canPublish, name: u.name };
+            if (u.name) map[u.name.toLowerCase().trim()] = { role: u.role, canPublish: u.canPublish, name: u.name };
           });
           setUsersMap(map);
         }
@@ -103,6 +113,9 @@ export default function AdminArticlesPage() {
       if (res.data?.success) {
         setArticles(res.data.articles || []);
         setTotal(res.data.total || 0);
+        if (typeof res.data.pendingApprovalCount === 'number') {
+          setPendingApprovalCount(res.data.pendingApprovalCount);
+        }
       }
     } catch (err) {
     } finally {
@@ -113,6 +126,18 @@ export default function AdminArticlesPage() {
   useEffect(() => {
     fetchArticles();
   }, [statusFilter, categoryFilter, authorFilter, page, pageSize, sortField, sortDirection]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    socket.emit('join_crm');
+    const handleEditorialUpdate = () => {
+      fetchArticles();
+    };
+    socket.on('editorial_activity', handleEditorialUpdate);
+    return () => {
+      socket.off('editorial_activity', handleEditorialUpdate);
+    };
+  }, []);
 
   // Handle Search Submission
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -157,6 +182,34 @@ export default function AdminArticlesPage() {
       } catch (err: any) {
         alert(err.response?.data?.message || 'Failed to delete article');
       }
+    }
+  };
+
+  const handleApproveArticle = async (id: string, title: string) => {
+    setProcessingApprovalId(id);
+    try {
+      await api.patch(`/articles/admin/${id}/approve`);
+      setLeadNotice(`Approved & published "${title}" to the live wire!`);
+      setTimeout(() => setLeadNotice(null), 4000);
+      fetchArticles();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to approve article');
+    } finally {
+      setProcessingApprovalId(null);
+    }
+  };
+
+  const handleRejectArticle = async (id: string, title: string) => {
+    setProcessingApprovalId(id);
+    try {
+      await api.patch(`/articles/admin/${id}/reject`);
+      setLeadNotice(`Rejected "${title}".`);
+      setTimeout(() => setLeadNotice(null), 4000);
+      fetchArticles();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reject article');
+    } finally {
+      setProcessingApprovalId(null);
     }
   };
 
@@ -282,13 +335,15 @@ export default function AdminArticlesPage() {
       <AdminHeader
         title="Articles"
         actions={
-          <Link
-            href="/admin/articles/create"
-            className="inline-flex items-center gap-1.5 rounded-md bg-navy-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-navy-800 transition-colors shadow-xs"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Create Article</span>
-          </Link>
+          !readOnlySectionEditor ? (
+            <Link
+              href="/admin/articles/create"
+              className="inline-flex items-center gap-1.5 rounded-md bg-navy-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-navy-800 transition-colors shadow-xs"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create Article</span>
+            </Link>
+          ) : undefined
         }
       />
 
@@ -308,11 +363,13 @@ export default function AdminArticlesPage() {
           {/* Row 1: Status Tabs & Search Input */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* Status Tabs */}
-            <div className="flex items-center gap-1 bg-wash p-1 rounded-lg border border-rule/60">
+            <div className="flex items-center gap-1 bg-wash p-1 rounded-lg border border-rule/60 flex-wrap">
               {[
                 { id: 'all', label: 'All' },
+                { id: 'under_review', label: 'Article Approval', badge: pendingApprovalCount },
                 { id: 'published', label: 'Published' },
                 { id: 'draft', label: 'Draft' },
+                { id: 'rejected', label: 'Rejected' },
                 { id: 'scheduled', label: 'Scheduled' },
                 { id: 'lead', label: '★ Lead Stories' },
               ].map((tab) => (
@@ -322,13 +379,24 @@ export default function AdminArticlesPage() {
                     setStatusFilter(tab.id);
                     setPage(1);
                   }}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
                     statusFilter === tab.id
                       ? 'bg-navy-900 text-white shadow-xs'
                       : 'text-muted hover:text-navy-900 hover:bg-white/60'
                   }`}
                 >
-                  {tab.label}
+                  <span>{tab.label}</span>
+                  {typeof tab.badge === 'number' && tab.badge > 0 && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                        statusFilter === tab.id
+                          ? 'bg-amber-400 text-navy-950'
+                          : 'bg-amber-100 text-amber-900 border border-amber-300'
+                      }`}
+                    >
+                      {tab.badge}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -523,8 +591,13 @@ export default function AdminArticlesPage() {
                       authorName.toLowerCase().trim() === currentUser.name.toLowerCase().trim()
                         ? currentUser.role
                         : null) ||
-                      'Editor'
+                      'editor'
                     ).toLowerCase();
+                    const authorCanPublish =
+                      authorObj?.canPublish ??
+                      (authorId ? usersMap[authorId]?.canPublish : undefined) ??
+                      usersMap[authorName.toLowerCase().trim()]?.canPublish;
+                    const authorRoleLabel = getRoleLabel(authorRole, authorCanPublish);
 
                     return (
                       <tr key={art._id} className="hover:bg-wash/50 transition-colors">
@@ -537,8 +610,8 @@ export default function AdminArticlesPage() {
                               {art.title}
                             </Link>
 
-                            {/* 1-Click Interactive Feature as Lead Story Button */}
-                            {art.status === 'published' && (
+                            {/* 1-Click Interactive Feature as Lead Story Button (Senior Editor & Admin only) */}
+                            {editorialManager && art.status === 'published' && (
                               <button
                                 type="button"
                                 onClick={() => handleToggleLeadStory(art)}
@@ -591,16 +664,14 @@ export default function AdminArticlesPage() {
                               className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
                                 authorRole === 'admin'
                                   ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                  : authorRole === 'editor'
+                                  : authorRoleLabel === 'Senior Editor'
                                   ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : authorRoleLabel === 'Section Editor'
+                                  ? 'bg-sky-50 text-sky-700 border-sky-200'
                                   : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                               }`}
                             >
-                              {authorRole === 'admin'
-                                ? 'Admin'
-                                : authorRole === 'editor'
-                                ? 'Editor'
-                                : 'Contributor'}
+                              {authorRoleLabel}
                             </span>
                           </div>
                         </td>
@@ -609,6 +680,16 @@ export default function AdminArticlesPage() {
                             <span className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-medium text-emerald-900">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
                               Published
+                            </span>
+                          ) : art.status === 'under_review' ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-semibold text-blue-900">
+                              <span className="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
+                              Pending Approval
+                            </span>
+                          ) : art.status === 'rejected' ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-rose-50 border border-rose-200 px-2 py-0.5 text-[11px] font-semibold text-rose-900">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-600"></span>
+                              Rejected
                             </span>
                           ) : art.status === 'scheduled' ? (
                             <span className="inline-flex items-center gap-1 rounded bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-medium text-amber-900">
@@ -635,32 +716,121 @@ export default function AdminArticlesPage() {
                         </td>
                         <td className="px-5 py-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
-                            {art.status === 'published' && (
-                              <Link
-                                href={`/articles/${art.slug}`}
-                                target="_blank"
-                                className="p-1 text-muted hover:text-navy-900"
-                                title="View live"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </Link>
-                            )}
-                            <Link
-                              href={`/admin/articles/${art._id}/edit`}
-                              className="p-1 text-navy-700 hover:text-navy-900"
-                              title="Edit article"
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </Link>
+                            {seniorEditor ? (
+                              <>
+                                <Link
+                                  href={`/admin/articles/${art._id}/edit`}
+                                  className="inline-flex items-center gap-1 rounded border border-rule bg-white px-2 py-1 text-[11px] font-semibold text-navy-900 hover:bg-wash"
+                                  title="View / Review Article"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                  <span>View</span>
+                                </Link>
 
-                            {currentUser?.role !== 'contributor' && (
-                              <button
-                                onClick={() => handleDelete(art._id, art.title)}
-                                className="p-1 text-muted hover:text-signal cursor-pointer"
-                                title="Delete article"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                                {art.status !== 'published' && (
+                                  <button
+                                    type="button"
+                                    disabled={processingApprovalId === art._id}
+                                    onClick={() => handleApproveArticle(art._id, art.title)}
+                                    className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+                                    title="Approve & Publish"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    <span>Approve</span>
+                                  </button>
+                                )}
+
+                                {art.status !== 'rejected' && (
+                                  <button
+                                    type="button"
+                                    disabled={processingApprovalId === art._id}
+                                    onClick={() => handleRejectArticle(art._id, art.title)}
+                                    className="inline-flex items-center gap-1 rounded border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
+                                    title="Reject Article"
+                                  >
+                                    <XCircle className="h-3 w-3" />
+                                    <span>Reject</span>
+                                  </button>
+                                )}
+
+                                {art.status === 'published' && (
+                                  <Link
+                                    href={`/articles/${art.slug}`}
+                                    target="_blank"
+                                    className="p-1 text-muted hover:text-navy-900"
+                                    title="View live"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Link>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {adminUser && art.status === 'under_review' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={processingApprovalId === art._id}
+                                      onClick={() => handleApproveArticle(art._id, art.title)}
+                                      className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+                                      title="Approve & Publish"
+                                    >
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      <span>Approve</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={processingApprovalId === art._id}
+                                      onClick={() => handleRejectArticle(art._id, art.title)}
+                                      className="inline-flex items-center gap-1 rounded border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
+                                      title="Reject Article"
+                                    >
+                                      <XCircle className="h-3 w-3" />
+                                      <span>Reject</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {art.status === 'published' && (
+                                  <Link
+                                    href={`/articles/${art.slug}`}
+                                    target="_blank"
+                                    className="p-1 text-muted hover:text-navy-900"
+                                    title="View live"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Link>
+                                )}
+
+                                {readOnlySectionEditor ? (
+                                  <Link
+                                    href={`/admin/articles/${art._id}/edit`}
+                                    className="inline-flex items-center gap-1 rounded border border-rule px-2 py-1 text-[11px] font-medium text-navy-900 hover:bg-wash"
+                                    title="View article (Read-Only)"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    <span>View</span>
+                                  </Link>
+                                ) : (
+                                  <Link
+                                    href={`/admin/articles/${art._id}/edit`}
+                                    className="p-1 text-navy-700 hover:text-navy-900"
+                                    title="Edit article"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </Link>
+                                )}
+
+                                {adminUser && (
+                                  <button
+                                    onClick={() => handleDelete(art._id, art.title)}
+                                    className="p-1 text-muted hover:text-signal cursor-pointer"
+                                    title="Delete article"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
